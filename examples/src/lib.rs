@@ -1,5 +1,4 @@
-use serde::Deserialize;
-use serde::Serialize;
+mod serde;
 
 #[riko::fun]
 fn nothing() {
@@ -9,30 +8,6 @@ fn nothing() {
 #[riko::fun(sig = "(I32, I32) -> I32")]
 fn i32(a: i32, b: i32) -> i32 {
     a + b
-}
-
-#[derive(Serialize, Deserialize)]
-struct Love {
-    pub target: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Work {
-    pub salary: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Life {
-    pub happy: bool,
-}
-
-type Job = Work;
-
-#[riko::fun(sig = "(Serde, Serde<Work>) -> Serde")]
-fn serde(love: Love, work: Job) -> Life {
-    Life {
-        happy: !love.target.is_empty() && work.salary > 0,
-    }
 }
 
 #[riko::fun(rename = "rename_ffi")]
