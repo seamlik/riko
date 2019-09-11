@@ -126,7 +126,7 @@ fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {
                 ERROR_MARSHALING_RULE_INVALID,
             ))
         } else {
-            Ok(&path.path.segments.first().unwrap().value())
+            Ok(path.path.segments.first().unwrap())
         }
     } else {
         Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE))
@@ -158,7 +158,7 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<String> {
                 ))
             } else {
                 let first_arg = args.args.first().unwrap();
-                if let GenericArgument::Type(first_arg_type) = first_arg.value() {
+                if let GenericArgument::Type(first_arg_type) = first_arg {
                     Ok(assert_type_clean(&first_arg_type)?.to_string())
                 } else {
                     Err(syn::Error::new(
