@@ -1,3 +1,4 @@
+mod iterators;
 mod serde;
 
 #[riko::fun]
@@ -12,7 +13,7 @@ fn i32(a: i32, b: i32) -> i32 {
 
 #[riko::fun(rename = "rename_ffi")]
 fn rename() {
-    println!("A function that to be renamed.");
+    println!("A function to be renamed.");
 }
 
 #[derive(riko::Heap)]

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "examples",
   "macros",
-  "runtime-rust"
+  "runtime-rust",
+  "samples/rust"
 ]

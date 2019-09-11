@@ -1,6 +1,6 @@
 [package]
 edition = "2018"
-name = "examples"
+name = "samples"
 publish = false
 version = "0.0.1"
 
@@ -8,6 +8,6 @@ version = "0.0.1"
 crate-type = ["cdylib"]
 
 [dependencies]
-riko = { path = "../macros" }
-riko_runtime = { path = "../runtime-rust" }
+riko = { path = "../../macros" }
+riko_runtime = { path = "../../runtime-rust" }
 serde = { version = "1.0.98", features = ["derive"] }
