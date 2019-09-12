@@ -20,8 +20,9 @@ use syn::ItemFn;
 ///
 /// # Parameters
 ///
-/// * `sig`: Marshaling signature. Defaults to an empty signature, i.e. no input or output.
-/// * `rename`: New name used when exporting the item, convenient for avoiding name clashes.
+/// * `sig`: Marshaling signature. Defaults to an empty signature, i.e. no input or output. See
+///   "Marshaling Rules" below.
+/// * `name`: Symbol name used when exporting the item, convenient for avoiding name clashes.
 ///
 /// Since procedural macros can only analyse a syntax tree and has no access to any type
 /// information, it is not possible to acurrately detect what marshaling rules to use for each

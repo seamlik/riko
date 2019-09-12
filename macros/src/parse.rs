@@ -57,7 +57,7 @@ impl Parse for MarshalingSignature {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct Fun {
-    pub rename: String,
+    pub name: String,
     pub sig: MarshalingSignature,
 }
 
@@ -66,8 +66,8 @@ impl Parse for Fun {
         let mut result = Fun::default();
         for arg in Punctuated::<KeyValue, Token![,]>::parse_terminated(input)? {
             let key = arg.key.to_string();
-            if key == "rename" {
-                result.rename = arg.value.value();
+            if key == "name" {
+                result.name = arg.value.value();
             } else if key == "sig" {
                 result.sig = arg.value.parse()?;
             } else {
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn Fun_parse() {
         let expected = Fun {
-            rename: "function2".to_owned(),
+            name: "function2".to_owned(),
             sig: MarshalingSignature {
                 inputs: vec![MarshalingRule::I32],
                 output: Some(MarshalingRule::I32),
@@ -249,7 +249,7 @@ mod tests {
         };
         let input = r#"
             sig = "(I32) -> I32",
-            rename = "function2"
+            name = "function2"
         "#;
         let actual = syn::parse_str::<Fun>(input).unwrap();
         assert_eq!(expected, actual);

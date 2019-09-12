@@ -11,8 +11,8 @@ fn i32(a: i32, b: i32) -> i32 {
     a + b
 }
 
-#[riko::fun(rename = "rename_ffi")]
-fn rename() {
+#[riko::fun(name = "rename")]
+fn rename_ffi() {
     println!("A function to be renamed.");
 }
 
