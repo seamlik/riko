@@ -1,7 +1,7 @@
 use crate::parse::MarshalingRule;
 use crate::parse::MarshalingSignature;
 use proc_macro::TokenStream;
-use proc_quote::quote;
+use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::FnArg;
 use syn::Ident;
