@@ -1,35 +1,25 @@
 //! Syntax tree parsing.
 
+use std::convert::TryFrom;
+use std::result::Result;
 use strum_macros::EnumString;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::AttributeArgs;
 use syn::GenericArgument;
 use syn::Ident;
+use syn::Lit;
 use syn::LitStr;
+use syn::Meta;
+use syn::NestedMeta;
 use syn::ParenthesizedGenericArguments;
 use syn::PathArguments;
 use syn::PathSegment;
 use syn::ReturnType;
 use syn::Token;
 use syn::Type;
-
-/// Key-value parameters for a macro.
-struct KeyValue {
-    // TODO: Use `AttributeArgs`
-    pub key: Ident,
-    pub value: LitStr,
-}
-
-impl Parse for KeyValue {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let key = input.parse::<Ident>()?;
-        input.parse::<Token![=]>()?;
-        let value = input.parse::<LitStr>()?;
-        Ok(KeyValue { key, value })
-    }
-}
 
 #[derive(Default, Debug, PartialEq)]
 pub struct MarshalingSignature {
@@ -61,20 +51,36 @@ pub struct Fun {
     pub sig: MarshalingSignature,
 }
 
-impl Parse for Fun {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+impl TryFrom<AttributeArgs> for Fun {
+    type Error = syn::Error;
+
+    fn try_from(value: AttributeArgs) -> Result<Self, Self::Error> {
         let mut result = Fun::default();
-        for arg in Punctuated::<KeyValue, Token![,]>::parse_terminated(input)? {
-            let key = arg.key.to_string();
-            if key == "name" {
-                result.name = arg.value.value();
-            } else if key == "sig" {
-                result.sig = arg.value.parse()?;
-            } else {
-                return Err(syn::Error::new(arg.key.span(), "Invalid argument."));
+        for arg in value {
+            match arg {
+                NestedMeta::Meta(Meta::NameValue(pair)) => match pair.path.get_ident() {
+                    Some(name) if name == "name" => {
+                        result.name = assert_lit_is_litstr(&pair.lit)?.value();
+                    }
+                    Some(name) if name == "sig" => {
+                        result.sig = assert_lit_is_litstr(&pair.lit)?.parse()?
+                    }
+
+                    _ => return Err(syn::Error::new(pair.path.span(), "Unrecognized argument.")),
+                },
+                _ => return Err(syn::Error::new(arg.span(), "Not a key-value.")),
             }
         }
         Ok(result)
+    }
+}
+
+impl Parse for Fun {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let args: AttributeArgs = Punctuated::<NestedMeta, Token![,]>::parse_terminated(input)?
+            .into_iter()
+            .collect();
+        Self::try_from(args)
     }
 }
 
@@ -172,16 +178,17 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<String> {
     }
 }
 
+fn assert_lit_is_litstr(src: &Lit) -> syn::Result<&LitStr> {
+    if let Lit::Str(litstr) = src {
+        Ok(litstr)
+    } else {
+        Err(syn::Error::new(src.span(), "Invalid value."))
+    }
+}
+
 #[allow(non_snake_case)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn KeyValue_parse() {
-        let actual = syn::parse_str::<KeyValue>(r#"love = "forever""#).unwrap();
-        assert_eq!((actual.key.to_string()), "love");
-        assert_eq!(actual.value.value(), "forever");
-    }
 
     #[test]
     fn MarshalingSignature_full() {
@@ -247,11 +254,10 @@ mod tests {
                 output: Some(MarshalingRule::I32),
             },
         };
-        let input = r#"
+        let actual: Fun = syn::parse_quote! {
             sig = "(I32) -> I32",
             name = "function2"
-        "#;
-        let actual = syn::parse_str::<Fun>(input).unwrap();
+        };
         assert_eq!(expected, actual);
     }
 }

@@ -11,6 +11,8 @@ mod parse;
 use parse::Fun;
 use proc_macro::TokenStream;
 use quote::ToTokens;
+use std::convert::TryInto;
+use syn::AttributeArgs;
 use syn::ItemFn;
 
 /// Generates language bindings for a free-standing function.
@@ -39,7 +41,9 @@ pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let function = syn::parse_macro_input!(item as ItemFn);
-    let args = syn::parse_macro_input!(attr as Fun);
+    let args: Fun = syn::parse_macro_input!(attr as AttributeArgs)
+        .try_into()
+        .expect("Failed to parse attribute arguments.");
 
     function.into_token_stream().into()
 }
