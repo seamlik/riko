@@ -110,8 +110,11 @@ impl MarshalingRule {
             .to_string()
             .parse()
             .map_err(|err: strum::ParseError| syn::Error::new(src.span(), err.to_string()))?;
-        if let MarshalingRule::Serde(ref mut serde_inner) = result {
-            *serde_inner = assert_patharguments_clean(&src.arguments)?.to_string();
+        if let Self::Serde(ref mut inner) = result {
+            *inner = match assert_patharguments_clean(&src.arguments)? {
+                Some(ident) => ident.to_string(),
+                None => String::default(),
+            }
         }
         Ok(result)
     }
@@ -151,9 +154,9 @@ fn assert_type_clean(src: &Type) -> syn::Result<&Ident> {
     }
 }
 
-fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<String> {
+fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>> {
     match &src {
-        PathArguments::None => Ok(String::default()),
+        PathArguments::None => Ok(None),
         PathArguments::AngleBracketed(ref args) => {
             if let Some(colon) = &args.colon2_token {
                 Err(syn::Error::new(colon.span(), ERROR_MARSHALING_RULE_IMPURE))
@@ -165,7 +168,7 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<String> {
             } else {
                 let first_arg = args.args.first().unwrap();
                 if let GenericArgument::Type(first_arg_type) = first_arg {
-                    Ok(assert_type_clean(&first_arg_type)?.to_string())
+                    Ok(Some(assert_type_clean(&first_arg_type)?))
                 } else {
                     Err(syn::Error::new(
                         first_arg.span(),
@@ -174,7 +177,7 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<String> {
                 }
             }
         }
-        _ => return Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE)),
+        _ => Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE)),
     }
 }
 
