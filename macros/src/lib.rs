@@ -10,7 +10,6 @@ mod parse;
 
 use parse::Fun;
 use proc_macro::TokenStream;
-use quote::ToTokens;
 use std::convert::TryInto;
 use syn::AttributeArgs;
 use syn::ItemFn;
@@ -34,25 +33,32 @@ use syn::ItemFn;
 /// The syntax of a marshaling signature is the same as the signature of a closure trait, e.g.
 /// `(A, B) -> C`. Each type must be one of the `MarshalingRule`s.
 #[proc_macro_attribute]
-pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     let config = config::current();
-    if config.enabled == false {
+    if !config.enabled {
         return item;
     }
 
-    let function = syn::parse_macro_input!(item as ItemFn);
     let args: Fun = syn::parse_macro_input!(attr as AttributeArgs)
         .try_into()
         .expect("Failed to parse attribute arguments.");
 
-    function.into_token_stream().into()
+    let signature = if let Ok(function) = syn::parse::<ItemFn>(item.clone()) {
+        function.sig
+    } else {
+        panic!("Applied to an unsupported language item.")
+    };
+
+    let generated: TokenStream = jni::gen_function_rust(&signature, &args, &config).into();
+    item.extend(generated);
+    item
 }
 
 #[proc_macro_derive(Heap)]
 #[allow(non_snake_case)]
 pub fn derive_Heap(item: TokenStream) -> TokenStream {
     let config = config::current();
-    if config.enabled == false {
+    if !config.enabled {
         return TokenStream::new();
     }
 

@@ -7,7 +7,7 @@ fn nothing() {
 }
 
 #[riko::fun(sig = "(I32, I32) -> I32")]
-fn i32(a: i32, b: i32) -> i32 {
+fn _i32(a: i32, b: i32) -> i32 {
     a + b
 }
 

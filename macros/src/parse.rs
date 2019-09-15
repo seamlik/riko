@@ -118,6 +118,17 @@ impl MarshalingRule {
         }
         Ok(result)
     }
+
+    pub fn to_rust_return_type(&self) -> syn::Result<Type> {
+        match self {
+            Self::Bytes => Ok(syn::parse_quote! { ::std::vec::Vec<u8> }),
+            Self::I8 => Ok(syn::parse_quote! { i8 }),
+            Self::I32 => Ok(syn::parse_quote! { i32 }),
+            Self::I64 => Ok(syn::parse_quote! { i64 }),
+            Self::Serde(inner) => syn::parse_str(inner),
+            Self::String => Ok(syn::parse_quote! { ::std::string::String }),
+        }
+    }
 }
 
 fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {

@@ -17,7 +17,7 @@ struct Life {
 }
 
 #[riko::fun(sig = "(Serde, Serde) -> Serde<Life>")]
-fn serde(love: Love, work: Work) -> Life {
+fn _serde(love: Love, work: &Work) -> Life {
     Life {
         happy: !love.target.is_empty() && work.salary > 0,
     }
