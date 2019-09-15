@@ -36,9 +36,20 @@ impl Parse for MarshalingSignature {
             inputs.push(MarshalingRule::from_type(&it)?);
         }
 
-        let output = match sig_raw.output {
+        let output = match &sig_raw.output {
             ReturnType::Default => None,
-            ReturnType::Type(_, r#type) => Some(MarshalingRule::from_type(&r#type)?),
+            ReturnType::Type(_, r#type) => {
+                let candidate = MarshalingRule::from_type(&r#type)?;
+                match &candidate {
+                    MarshalingRule::Serde(inner) if inner.is_empty() => {
+                        return Err(syn::Error::new(
+                            sig_raw.output.span(),
+                            "Must specify the type for `Serde` in the return position.",
+                        ));
+                    }
+                    _ => Some(candidate),
+                }
+            }
         };
 
         Ok(Self { inputs, output })
