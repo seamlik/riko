@@ -17,7 +17,7 @@ class HeapTests {
     }
 
     void run() {
-      assertNotFreed();
+      assertAlive();
       // Nothing
     }
   }
