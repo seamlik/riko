@@ -10,6 +10,7 @@ use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
 
+/// Generates Rust code wrapping a function.
 pub fn gen_function_rust(sig: &Signature, args: &Fun, config: &Config) -> TokenStream {
     // Name of the generated function
     let original_name = &sig.ident;

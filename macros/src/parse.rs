@@ -45,6 +45,7 @@ impl Parse for MarshalingSignature {
     }
 }
 
+/// Represents a `#[fun]`.
 #[derive(Default, Debug, PartialEq)]
 pub struct Fun {
     pub name: String,
@@ -131,6 +132,7 @@ impl MarshalingRule {
     }
 }
 
+/// Asserts a [Type] contains only 1 segment (e.g. `Foo<Bar>` instead of `some::Foo<Bar>`).
 fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {
     if let Type::Path(path) = src {
         if path.qself.is_some() {
@@ -153,6 +155,7 @@ fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {
     }
 }
 
+/// Asserts a [Type] is in the simplest form (like `Foo`) and returns it as an [Ident].
 fn assert_type_clean(src: &Type) -> syn::Result<&Ident> {
     let segment = assert_type_no_prefix(src)?;
     if segment.arguments.is_empty() {
@@ -245,14 +248,14 @@ mod tests {
     }
 
     #[test]
-    fn Marshaling_Signature_nothing() {
+    fn MarshalingSignature_nothing() {
         let actual = syn::parse_str::<MarshalingSignature>("()").unwrap();
         assert!(actual.inputs.is_empty());
         assert_eq!(actual.output, None);
     }
 
     #[test]
-    fn Marshaling_Signature_invalid() {
+    fn MarshalingSignature_invalid() {
         syn::parse_str::<MarshalingSignature>("() -> &Bytes").unwrap_err();
         syn::parse_str::<MarshalingSignature>("() -> ::Bytes").unwrap_err();
         syn::parse_str::<MarshalingSignature>("() -> std::Bytes").unwrap_err();

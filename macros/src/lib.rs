@@ -14,10 +14,10 @@ use std::convert::TryInto;
 use syn::AttributeArgs;
 use syn::ItemFn;
 
-/// Generates language bindings for a free-standing function.
+/// Generates language bindings for a function.
 ///
 /// This attribute only applies on a
-/// [function item](https://doc.rust-lang.org/reference/items/functions.html).
+/// [free-standing function](https://doc.rust-lang.org/reference/items/functions.html).
 ///
 /// # Parameters
 ///
@@ -25,13 +25,82 @@ use syn::ItemFn;
 ///   "Marshaling Rules" below.
 /// * `name`: Symbol name used when exporting the item, convenient for avoiding name clashes.
 ///
-/// Since procedural macros can only analyse a syntax tree and has no access to any type
-/// information, it is not possible to acurrately detect what marshaling rules to use for each
+/// # Marshaling Rules
+///
+/// Since procedural macros can only analyse a syntax tree and have no access to any type
+/// information, it is impossible to acurrately determine what marshaling rules to use for each
 /// parameters and return type of a function. Therefore, user must specify the marshaling rules
 /// manually.
 ///
-/// The syntax of a marshaling signature is the same as the signature of a closure trait, e.g.
-/// `(A, B) -> C`. Each type must be one of the `MarshalingRule`s.
+/// The syntax of a marshaling signature is the same as the signature of a closure, e.g.
+/// `(A, B) -> C`. Each component in the signature must be one of the "marshaling rules".
+///
+/// The following marshaling rules are supported:
+///
+/// * Bytes
+/// * I8
+/// * I32
+/// * I64
+/// * Iterator
+/// * Serde
+/// * String
+///
+/// ## Primitives
+///
+/// All the rules except `Iterator` and `Serde` are for marshaling primitive types or built-in
+/// standard types.
+///
+/// These rules specify how the data is copied and sent between the FFI boundary. For example, `I32`
+/// means the data will be serialized as a 32-bit integer, and will be deserialized as an `int` on
+/// the Java side.
+///
+/// For now, the primitive rules are a bit limiting (no unsigned integers, for example). This is
+/// because we only want to make sure they work with all target languages (Java does not have
+/// unsigned integers, for example).
+///
+/// ## `Serde`
+///
+/// This rule is for custom types that support serialzation and deserialization through
+/// [Serde](https://serde.rs).
+///
+/// In the return position, user must specify the data type in the form of `Serde<X>`. The type can
+/// be anything that is resolvable in the current scope. For example:
+///
+/// ```rust
+/// struct Love;
+/// type Home = Love;
+///
+/// #[riko::fun(sig = "(Serde) -> Serde<Love>")]
+/// fn search(love: Love) -> Home {
+///     love
+/// }
+/// ```
+///
+/// ## `Iterator`
+///
+/// This rule is for marshaling an iterator. It exists because it is a performance issue to marshal
+/// a very large byte array across the FFI. Another reason is that some libraries provides event
+/// APIs in the form of iterators instead of `Stream`s.
+///
+/// User must specify the item type in the rule in the form of `Iterator<X>`.
+///
+/// Due to technical difficulties, this rule only supports marshaling a `MarshalingIterator` and
+/// only in the return posigion.
+///
+/// ## Errors and Nullness
+///
+/// Unless specified, most of the rules work with their corresponding Rust types being wrapped
+/// inside an [Option]. In the return position, wrapping the type in a [Result](std::result::Result)
+/// is also supported. For example:
+///
+/// ```rust
+/// use std::io::Result;
+///
+/// #[riko::fun(sig = "(String, String) -> String")]
+/// fn fun(a: String, b: Option<String>) -> Result<Option<String>> {
+///     Ok(Some("Love".to_string()))
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     let config = config::current();
