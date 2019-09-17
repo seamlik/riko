@@ -13,6 +13,7 @@ use proc_macro::TokenStream;
 use std::convert::TryInto;
 use syn::AttributeArgs;
 use syn::ItemFn;
+use syn::ItemStruct;
 
 /// Generates language bindings for a function.
 ///
@@ -123,13 +124,18 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     item
 }
 
+/// Generates language bindings for a Rust type allocated in the heap.
+///
+/// Deriving this trait allows code on the target side to construct an object and put it on the
+/// heap. This is achieved by creating a global object pool dedicated to the type deriving the
+/// trait.
 #[proc_macro_derive(Heap)]
-#[allow(non_snake_case)]
-pub fn derive_Heap(item: TokenStream) -> TokenStream {
+pub fn derive_heap(item: TokenStream) -> TokenStream {
     let config = config::current();
     if !config.enabled {
         return TokenStream::new();
     }
 
-    TokenStream::new()
+    let item_struct = syn::parse_macro_input!(item as ItemStruct);
+    jni::gen_heap_rust(&item_struct.ident).into()
 }

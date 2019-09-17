@@ -9,6 +9,24 @@ use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
 
+/// Generates Rust code wrapping a `Heap`.
+pub fn gen_heap_rust(name: &Ident) -> TokenStream {
+    let pool_name = quote::format_ident!("__RIKO_POOL_{}", name);
+    let result = quote! {
+        impl ::riko_runtime::Heap for #name {
+            fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
+                ::riko_runtime::heap::store(&#pool_name, self).into()
+            }
+        }
+
+        ::lazy_static::lazy_static! {
+            #[allow(non_upper_case_globals)]
+            static ref #pool_name: ::riko_runtime::heap::Pool<#name> = ::std::default::Default::default();
+        }
+    };
+    result.into()
+}
+
 /// Generates Rust code wrapping a function.
 pub fn gen_function_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     // Name of the generated function
@@ -171,6 +189,29 @@ mod tests {
             }
         }
         .to_string();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn heap() {
+        let protagonist: syn::ItemStruct = syn::parse_quote! {
+            struct NuclearReactor;
+        };
+        let actual = gen_heap_rust(&protagonist.ident).to_string();
+
+        let expected = quote ! {
+            impl ::riko_runtime::Heap for NuclearReactor {
+                fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
+                    ::riko_runtime::heap::store(&__RIKO_POOL_NuclearReactor, self).into()
+                }
+            }
+
+            ::lazy_static::lazy_static! {
+                #[allow(non_upper_case_globals)]
+                static ref __RIKO_POOL_NuclearReactor: ::riko_runtime::heap::Pool<NuclearReactor> = ::std::default::Default::default();
+            }
+        }.to_string();
 
         assert_eq!(expected, actual);
     }

@@ -8,6 +8,8 @@ version = "0.0.1"
 crate-type = ["cdylib"]
 
 [dependencies]
+jni = "0.13.1"
+lazy_static = "1.4.0"
 riko = { path = "../../macros" }
 riko_runtime = { path = "../../runtime-rust" }
 serde = { version = "1.0.98", features = ["derive"] }

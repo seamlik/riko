@@ -1,4 +1,4 @@
-mod iterators;
+mod heap;
 mod serde;
 
 #[riko::fun]
@@ -15,6 +15,3 @@ fn _i32(a: i32, b: i32) -> i32 {
 fn rename_ffi() {
     println!("A function to be renamed.");
 }
-
-#[derive(riko::Heap)]
-struct NuclearReactor;
