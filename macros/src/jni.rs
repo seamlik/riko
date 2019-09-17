@@ -28,7 +28,7 @@ pub fn gen_heap_rust(name: &Ident) -> TokenStream {
 }
 
 /// Generates Rust code wrapping a function.
-pub fn gen_function_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
+pub fn gen_fun_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     // Name of the generated function
     let original_name = &sig.ident;
     let result_name = mangle_function(&original_name.to_string(), &args.name, module);
@@ -145,7 +145,7 @@ mod tests {
             fn function() {}
         };
         let args = Fun::default();
-        let actual = gen_function_rust(&function.sig, &args, "").to_string();
+        let actual = gen_fun_rust(&function.sig, &args, "").to_string();
 
         let expected = quote! {
             #[no_mangle]
@@ -171,7 +171,7 @@ mod tests {
         let args: Fun = syn::parse_quote! {
             sig = "(String, String) -> String"
         };
-        let actual = gen_function_rust(&function.sig, &args, "").to_string();
+        let actual = gen_fun_rust(&function.sig, &args, "").to_string();
 
         let expected = quote! {
             #[no_mangle]
