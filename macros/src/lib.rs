@@ -118,7 +118,7 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
         panic!("Applied to an unsupported language item.")
     };
 
-    let generated: TokenStream = jni::gen_function_rust(&signature, &args, &config).into();
+    let generated: TokenStream = jni::gen_function_rust(&signature, &args, &config.module).into();
     item.extend(generated);
     item
 }

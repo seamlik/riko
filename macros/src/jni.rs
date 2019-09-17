@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::parse::Fun;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -11,10 +10,10 @@ use syn::Signature;
 use syn::Type;
 
 /// Generates Rust code wrapping a function.
-pub fn gen_function_rust(sig: &Signature, args: &Fun, config: &Config) -> TokenStream {
+pub fn gen_function_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     // Name of the generated function
     let original_name = &sig.ident;
-    let result_name = mangle_function(&original_name.to_string(), &args.name, &config.module);
+    let result_name = mangle_function(&original_name.to_string(), &args.name, module);
 
     // Parameters of the generated function
     let mut result_params = Vec::<TokenStream>::new();
@@ -123,13 +122,12 @@ mod tests {
     }
 
     #[test]
-    fn rust_nothing() {
+    fn fun_nothing() {
         let function: syn::ItemFn = syn::parse_quote! {
             fn function() {}
         };
         let args = Fun::default();
-        let config = Config::default();
-        let actual = gen_function_rust(&function.sig, &args, &config).to_string();
+        let actual = gen_function_rust(&function.sig, &args, "").to_string();
 
         let expected = quote! {
             #[no_mangle]
@@ -146,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn rust_simple() {
+    fn fun_simple() {
         let function: syn::ItemFn = syn::parse_quote! {
             fn function(a: &String, b: Option<String>) -> Result<Option<String>> {
                 unimplemented!()
@@ -155,8 +153,7 @@ mod tests {
         let args: Fun = syn::parse_quote! {
             sig = "(String, String) -> String"
         };
-        let config = Config::default();
-        let actual = gen_function_rust(&function.sig, &args, &config).to_string();
+        let actual = gen_function_rust(&function.sig, &args, "").to_string();
 
         let expected = quote! {
             #[no_mangle]
