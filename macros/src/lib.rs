@@ -8,6 +8,7 @@ mod config;
 mod jni;
 mod parse;
 
+use crate::config::Config;
 use parse::Fun;
 use proc_macro::TokenStream;
 use std::convert::TryInto;
@@ -113,13 +114,17 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
         .try_into()
         .expect("Failed to parse attribute arguments.");
 
-    let signature = if let Ok(function) = syn::parse::<ItemFn>(item.clone()) {
-        function.sig
+    let subject = if let Ok(item_fn) = syn::parse::<ItemFn>(item.clone()) {
+        FunSubject::Function(item_fn)
     } else {
         panic!("Applied to an unsupported language item.")
     };
 
-    let generated: TokenStream = jni::gen_fun_rust(&signature, &args, &config.module).into();
+    let mut generated = Vec::<TokenStream>::new();
+    if config.jni.enabled {
+        generated.push(jni::Bindgen::new(&config).gen_fun(&subject, &args));
+    }
+
     item.extend(generated);
     item
 }
@@ -137,5 +142,18 @@ pub fn derive_heap(item: TokenStream) -> TokenStream {
     }
 
     let item_struct = syn::parse_macro_input!(item as ItemStruct);
-    jni::gen_heap_rust(&item_struct.ident).into()
+    jni::Bindgen::new(&config).gen_heap(&item_struct).into()
+}
+
+/// Language binding generator.
+trait Bindgen<'cfg> {
+    fn new(config: &'cfg Config) -> Self;
+    fn config(&self) -> &'cfg Config;
+    fn gen_heap(&self, item: &ItemStruct) -> TokenStream;
+    fn gen_fun(&self, item: &FunSubject, args: &Fun) -> TokenStream;
+}
+
+/// Item on which a `#[fun]` can be applied.
+enum FunSubject {
+    Function(ItemFn),
 }

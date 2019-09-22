@@ -1,13 +1,40 @@
+use crate::config::Config;
 use crate::parse::Fun;
+use crate::FunSubject;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::FnArg;
 use syn::Ident;
+use syn::ItemStruct;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
+
+pub struct Bindgen<'cfg> {
+    config: &'cfg Config,
+}
+
+impl<'cfg> crate::Bindgen<'cfg> for Bindgen<'cfg> {
+    fn gen_fun(&self, item: &FunSubject, args: &Fun) -> proc_macro::TokenStream {
+        let signature = match item {
+            FunSubject::Function(inner) => &inner.sig,
+        };
+        gen_fun_rust(signature, args, &self.config().module).into()
+    }
+
+    fn new(config: &'cfg Config) -> Self {
+        Self { config }
+    }
+    fn config(&self) -> &'cfg Config {
+        self.config
+    }
+
+    fn gen_heap(&self, item: &ItemStruct) -> proc_macro::TokenStream {
+        gen_heap_rust(&item.ident).into()
+    }
+}
 
 /// Generates Rust code wrapping a `Heap`.
 pub fn gen_heap_rust(name: &Ident) -> TokenStream {
