@@ -103,6 +103,15 @@ use syn::ItemStruct;
 ///     Ok(Some("Love".to_string()))
 /// }
 /// ```
+///
+/// ## References and borrowed Types
+///
+/// For function parameters, references are also supported. Unfortunately, the borrowed version of
+/// a specific type is not supported (e.g. `&str` instead of `&String`), as that will prevent us
+/// from benefiting from the compiler's type inference and will lose the support of
+/// [Result](std::result::Result) and [Option](std::option::Option), which is of higher priority.
+///
+/// For returned types, only owned types are supported.
 #[proc_macro_attribute]
 pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     let config = config::current();
