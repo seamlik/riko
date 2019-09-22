@@ -51,7 +51,7 @@ pub fn gen_heap_rust(name: &Ident) -> TokenStream {
             static ref #pool_name: ::riko_runtime::heap::Pool<#name> = ::std::default::Default::default();
         }
     };
-    result.into()
+    result
 }
 
 /// Generates Rust code wrapping a function.
