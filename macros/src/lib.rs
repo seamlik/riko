@@ -65,18 +65,7 @@ use syn::ItemStruct;
 /// This rule is for custom types that support serialzation and deserialization through
 /// [Serde](https://serde.rs).
 ///
-/// In the return position, user must specify the data type in the form of `Serde<X>`. The type can
-/// be anything that is resolvable in the current scope. For example:
-///
-/// ```rust
-/// struct Love;
-/// type Home = Love;
-///
-/// #[riko::fun(sig = "(Serde) -> Serde<Love>")]
-/// fn search(love: Love) -> Home {
-///     love
-/// }
-/// ```
+/// User must specify the data type in the form of `Serde<X>`.
 ///
 /// ## `Iterator`
 ///
