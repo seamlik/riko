@@ -30,5 +30,5 @@ pub trait Marshaled: Serialize + DeserializeOwned {
     }
 }
 
-/// All data types that supports Serde altomatically implements this trait.
-impl<'de, T: Serialize + DeserializeOwned> Marshaled for T {}
+/// All data types that supports Serde automatically implement this trait.
+impl<T: Serialize + DeserializeOwned> Marshaled for T {}
