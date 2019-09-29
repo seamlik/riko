@@ -5,35 +5,11 @@
 
 use ::jni::sys::jbyteArray;
 use ::jni::JNIEnv;
-use heap::Handle;
-use returned::Returned;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::error::Error;
 
 pub mod heap;
 pub mod returned;
-
-/// Object allocated in the heap.
-///
-/// These objects are allocated and freed on the Rust side while only expose a reference to the
-/// target side. Target code must integrate the manual memory management into its own mechanism as
-/// those memory management strategy (usually garbage collection) is not aware of any native code.
-pub trait Heap: Sized {
-    fn into_handle(self) -> Returned<Handle>;
-}
-
-impl<T: Heap, E: Error> Heap for Result<T, E> {
-    fn into_handle(self) -> Returned<Handle> {
-        match self {
-            Ok(obj) => obj.into_handle(),
-            Err(err) => Returned {
-                error: Some(err.into()),
-                value: None,
-            },
-        }
-    }
-}
 
 /// Object marshaled between the FFI boundry.
 ///

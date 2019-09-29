@@ -132,7 +132,7 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
 /// Deriving this trait allows code on the target side to construct an object and put it on the
 /// heap. This is achieved by creating a global object pool dedicated to the type deriving the
 /// trait.
-#[proc_macro_derive(Heap)]
+#[proc_macro_derive(Heaped)]
 pub fn derive_heap(item: TokenStream) -> TokenStream {
     let config = config::current();
     if !config.enabled {
@@ -140,14 +140,14 @@ pub fn derive_heap(item: TokenStream) -> TokenStream {
     }
 
     let item_struct = syn::parse_macro_input!(item as ItemStruct);
-    jni::Bindgen::new(&config).gen_heap(&item_struct).into()
+    jni::Bindgen::new(&config).gen_heaped(&item_struct)
 }
 
 /// Language binding generator.
 trait Bindgen<'cfg> {
     fn new(config: &'cfg Config) -> Self;
     fn config(&self) -> &'cfg Config;
-    fn gen_heap(&self, item: &ItemStruct) -> TokenStream;
+    fn gen_heaped(&self, item: &ItemStruct) -> TokenStream;
     fn gen_fun(&self, item: &FunSubject, args: &Fun) -> TokenStream;
 }
 

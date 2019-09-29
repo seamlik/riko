@@ -31,16 +31,16 @@ impl<'cfg> crate::Bindgen<'cfg> for Bindgen<'cfg> {
         self.config
     }
 
-    fn gen_heap(&self, item: &ItemStruct) -> proc_macro::TokenStream {
-        gen_heap_rust(&item.ident).into()
+    fn gen_heaped(&self, item: &ItemStruct) -> proc_macro::TokenStream {
+        gen_heaped_rust(&item.ident).into()
     }
 }
 
-/// Generates Rust code wrapping a `Heap`.
-pub fn gen_heap_rust(name: &Ident) -> TokenStream {
+/// Generates Rust code wrapping a `Heaped`.
+pub fn gen_heaped_rust(name: &Ident) -> TokenStream {
     let pool_name = quote::format_ident!("__RIKO_POOL_{}", name);
     let result = quote! {
-        impl ::riko_runtime::Heap for #name {
+        impl ::riko_runtime::heap::Heaped for #name {
             fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
                 ::riko_runtime::heap::store(&#pool_name, self).into()
             }
@@ -225,10 +225,10 @@ mod tests {
         let protagonist: syn::ItemStruct = syn::parse_quote! {
             struct NuclearReactor;
         };
-        let actual = gen_heap_rust(&protagonist.ident).to_string();
+        let actual = gen_heaped_rust(&protagonist.ident).to_string();
 
         let expected = quote ! {
-            impl ::riko_runtime::Heap for NuclearReactor {
+            impl ::riko_runtime::heap::Heaped for NuclearReactor {
                 fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
                     ::riko_runtime::heap::store(&__RIKO_POOL_NuclearReactor, self).into()
                 }

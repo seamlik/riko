@@ -3,13 +3,13 @@ package riko;
 /**
  * Rust object allocated on the heap.
  */
-public abstract class Heap implements AutoCloseable {
+public abstract class Heaped implements AutoCloseable {
 
   protected final int handle;
   private boolean freed = false;
   private boolean consumed = false;
 
-  protected Heap(final int handle) {
+  protected Heaped(final int handle) {
     this.handle = handle;
   }
 

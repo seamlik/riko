@@ -1,18 +1,41 @@
-//! Operations for handling heap-allocated objects.
+//! Handling heap-allocated objects.
 
+use crate::returned::Returned;
 use rand::Rng;
 use std::collections::HashMap;
+use std::error::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
 
-/// Thread-safe and type-safe collection of [Heap](crate::Heap)s.
+/// Object allocated in the heap.
+///
+/// These objects are allocated and freed on the Rust side while only expose a reference to the
+/// target side. Target code must integrate the manual memory management into its own mechanism as
+/// those memory management strategy (usually garbage collection) is not aware of any native code.
+pub trait Heaped: Sized {
+    fn into_handle(self) -> Returned<Handle>;
+}
+
+impl<T: Heaped, E: Error> Heaped for Result<T, E> {
+    fn into_handle(self) -> Returned<Handle> {
+        match self {
+            Ok(obj) => obj.into_handle(),
+            Err(err) => Returned {
+                error: Some(err.into()),
+                value: None,
+            },
+        }
+    }
+}
+
+/// Thread-safe and type-safe collection of [Heaped](crate::heap::Heaped)s.
 pub type Pool<T> = RwLock<HashMap<Handle, Arc<Mutex<T>>>>;
 
-/// Opaque handle pointing to a [Heap](crate::Heap).
+/// Opaque handle pointing to a [Heaped](crate::heap::Heaped).
 pub type Handle = i32;
 
-/// Applies a closure on a [Heap](crate::Heap).
+/// Applies a closure on a [Heaped](crate::heap::Heaped).
 pub fn peek<T, R>(pool: &Pool<T>, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
     let pool_guard = pool.read().expect("Failed to read-lock the pool!");
     let raw = pool_guard.get(&handle).expect("Invalid handle!").clone();
