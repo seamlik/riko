@@ -54,12 +54,14 @@ impl<T> From<T> for Returned<T> {
 
 #[derive(Serialize, Deserialize)]
 pub struct Error {
+    pub debug: String,
     pub message: String,
 }
 
 impl<T: std::error::Error> From<T> for Error {
     fn from(src: T) -> Self {
         Error {
+            debug: format!("{:?}", src),
             message: src.to_string(),
         }
     }
