@@ -39,27 +39,26 @@ use syn::ItemStruct;
 ///
 /// The following marshaling rules are supported:
 ///
-/// * Bool
-/// * Bytes
-/// * I8
-/// * I32
-/// * I64
-/// * Iterator
-/// * Serde
-/// * String
-///
-/// ## Primitives
-///
-/// All the rules except `Iterator` and `Serde` are for marshaling primitive types or built-in
-/// standard types.
+/// * `Bool`
+/// * `Bytes`
+/// * `I8`
+/// * `I32`
+/// * `I64`
+/// * `Iterator`
+/// * `Serde`
+/// * `String`
 ///
 /// These rules specify how the data is copied and sent between the FFI boundary. For example, `I32`
 /// means the data will be serialized as a 32-bit integer, and will be deserialized as an `int` on
 /// the Java side.
 ///
-/// For now, the primitive rules are a bit limiting (no unsigned integers, for example). This is
+/// For now, the rules are a bit limiting (no unsigned integers, for example). This is
 /// because we only want to make sure they work with all target languages (Java does not have
 /// unsigned integers, for example).
+///
+/// ## `Bytes`
+///
+/// For marshaling a byte array, namely `Vec<u8>`. This rule exists because it is commonly used.
 ///
 /// ## `Serde`
 ///
@@ -84,24 +83,15 @@ use syn::ItemStruct;
 /// ## Errors and Nullness
 ///
 /// Unless specified, most of the rules work with their corresponding Rust types being wrapped
-/// inside an [Option]. In the return position, wrapping the type in a [Result](std::result::Result)
-/// is also supported. For example:
-///
-/// ```rust
-/// use std::io::Result;
-///
-/// #[riko::fun(sig = "(String, String) -> String")]
-/// fn fun(a: String, b: Option<String>) -> Result<Option<String>> {
-///     Ok(Some("Love".to_string()))
-/// }
-/// ```
+/// inside an [Option]. In the return position, wrapping the type in a [Result]
+/// is also supported.
 ///
 /// ## References and borrowed Types
 ///
 /// For function parameters, references are also supported. Unfortunately, the borrowed version of
 /// a specific type is not supported (e.g. `&str` instead of `&String`), as that will prevent us
 /// from benefiting from the compiler's type inference and will lose the support of
-/// [Result](std::result::Result) and [Option](std::option::Option), which is of higher priority.
+/// [Result] and [Option], which is of higher priority.
 ///
 /// For returned types, only owned types are supported.
 #[proc_macro_attribute]
