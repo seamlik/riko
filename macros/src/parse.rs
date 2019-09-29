@@ -27,6 +27,22 @@ pub struct MarshalingSignature {
     pub output: Option<MarshalingRule>,
 }
 
+impl MarshalingSignature {
+    pub fn has_iterators(&self) -> bool {
+        if let Some(MarshalingRule::Iterator(_)) = self.output {
+            true
+        } else {
+            self.inputs.iter().any(|rule| {
+                if let MarshalingRule::Iterator(_) = rule {
+                    true
+                } else {
+                    false
+                }
+            })
+        }
+    }
+}
+
 impl Parse for MarshalingSignature {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let sig_raw = input.parse::<ParenthesizedGenericArguments>()?;
@@ -103,6 +119,7 @@ pub enum MarshalingRule {
     I8,
     I32,
     I64,
+    Iterator(String),
     Serde(String),
     String,
 }
@@ -123,11 +140,16 @@ impl MarshalingRule {
             .to_string()
             .parse()
             .map_err(|err: strum::ParseError| syn::Error::new(src.span(), err.to_string()))?;
-        if let Self::Serde(ref mut inner) = result {
-            *inner = match assert_patharguments_clean(&src.arguments)? {
+        let ident_to_inner = || {
+            assert_patharguments_clean(&src.arguments).map(|it| match it {
                 Some(ident) => ident.to_string(),
                 None => String::default(),
-            }
+            })
+        };
+        if let Self::Serde(ref mut inner) = result {
+            *inner = ident_to_inner()?;
+        } else if let Self::Iterator(ref mut inner) = result {
+            *inner = ident_to_inner()?;
         }
         Ok(result)
     }
@@ -139,6 +161,7 @@ impl MarshalingRule {
             Self::I8 => Ok(syn::parse_quote! { i8 }),
             Self::I32 => Ok(syn::parse_quote! { i32 }),
             Self::I64 => Ok(syn::parse_quote! { i64 }),
+            Self::Iterator(_) => Ok(syn::parse_quote! { _ }),
             Self::Serde(inner) => syn::parse_str(inner),
             Self::String => Ok(syn::parse_quote! { ::std::string::String }),
         }
@@ -254,6 +277,16 @@ mod tests {
     }
 
     #[test]
+    fn MarshalingSignature_iterator() {
+        let actual = syn::parse_str::<MarshalingSignature>("() -> Iterator<String>").unwrap();
+        assert!(actual.inputs.is_empty());
+        assert_eq!(
+            actual.output,
+            Some(MarshalingRule::Iterator("String".to_owned()))
+        );
+    }
+
+    #[test]
     fn MarshalingSignature_no_args() {
         let actual = syn::parse_str::<MarshalingSignature>("() -> Bytes").unwrap();
         assert!(actual.inputs.is_empty());
@@ -273,6 +306,18 @@ mod tests {
         syn::parse_str::<MarshalingSignature>("() -> ::Bytes").unwrap_err();
         syn::parse_str::<MarshalingSignature>("() -> std::Bytes").unwrap_err();
         syn::parse_str::<MarshalingSignature>("() -> ").unwrap_err();
+    }
+
+    #[test]
+    fn MarshalingSignature_has_iterators() {
+        assert!(
+            syn::parse_str::<MarshalingSignature>("() -> Iterator<String>")
+                .unwrap()
+                .has_iterators()
+        );
+        assert!(!syn::parse_str::<MarshalingSignature>("() -> String")
+            .unwrap()
+            .has_iterators());
     }
 
     #[test]

@@ -8,6 +8,7 @@ use syn::spanned::Spanned;
 use syn::FnArg;
 use syn::Ident;
 use syn::ItemStruct;
+use syn::ItemUse;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
@@ -56,9 +57,18 @@ pub fn gen_heaped_rust(name: &Ident) -> TokenStream {
 
 /// Generates Rust code wrapping a function.
 pub fn gen_fun_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
+    // Global defs
+    let has_iterators = args.sig.has_iterators();
+
     // Name of the generated function
     let original_name = &sig.ident;
     let result_name = mangle_function(&original_name.to_string(), &args.name, module);
+
+    // `use` statements
+    let mut result_uses = Vec::<ItemUse>::new();
+    if has_iterators {
+        result_uses.push(syn::parse_quote! { use ::riko_runtime::iterators::IntoReturned; })
+    }
 
     // Parameters of the generated function
     let mut result_params = Vec::<TokenStream>::new();
@@ -95,6 +105,11 @@ pub fn gen_fun_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     }
 
     // Block that calls the original function
+    let result_invocation_conversion = if has_iterators {
+        quote! { .__riko_into_returned() }
+    } else {
+        quote! { .into() }
+    };
     let result_block_invocation = match &args.sig.output {
         Some(output) => {
             let output_type = output
@@ -104,7 +119,9 @@ pub fn gen_fun_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
             quote! {
                 let result: ::riko_runtime::returned::Returned< #output_type > = #original_name(
                     #(#result_args_invoked),*
-                ).into();
+                )
+                #result_invocation_conversion ;
+
                 ::riko_runtime::Marshaled::to_jni(&result, &_env)
             }
         }
@@ -121,6 +138,7 @@ pub fn gen_fun_rust(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     let result = quote! {
         #[no_mangle]
         pub extern "C" fn #result_name(#(#result_params),*) #result_output {
+            #(#result_uses)*
             #result_block_invocation
         }
     };
@@ -212,6 +230,42 @@ mod tests {
                     &(::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni)),
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
                 ).into();
+                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+            }
+        }
+        .to_string();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn fun_iterators() {
+        let function: syn::ItemFn = syn::parse_quote! {
+            fn function(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
+                unimplemented!()
+            }
+        };
+        let args: Fun = syn::parse_quote! {
+            sig = "(String, String) -> Iterator<String>"
+        };
+        let actual = gen_fun_rust(&function.sig, &args, "").to_string();
+
+        let expected = quote! {
+            #[no_mangle]
+            pub extern "C" fn Java_Module__1_1riko_1function(
+                _env: ::jni::JNIEnv,
+                _class: ::jni::objects::JClass,
+                arg_0_jni: ::jni::sys::jbyteArray,
+                arg_1_jni: ::jni::sys::jbyteArray
+            ) -> ::jni::sys::jbyteArray {
+                use ::riko_runtime::iterators::IntoReturned;
+
+                let result: ::riko_runtime::returned::Returned<_> = function(
+                    ::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni),
+                    ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
+                )
+                .__riko_into_returned();
+
                 ::riko_runtime::Marshaled::to_jni(&result, &_env)
             }
         }

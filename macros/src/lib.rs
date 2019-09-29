@@ -70,14 +70,16 @@ use syn::ItemStruct;
 ///
 /// ## `Iterator`
 ///
-/// This rule is for marshaling an iterator. It exists because it is a performance issue to marshal
-/// a very large byte array across the FFI. Another reason is that some libraries provides event
-/// APIs in the form of iterators instead of `Stream`s.
+/// This rule is for marshaling an [Iterator]. It exists because it is a performance issue to
+/// marshal a very large byte array across the FFI. Another reason is that some libraries provides
+/// event subscriptions in the form of [Iterator]s instead of `Stream`s.
+///
+/// For now, only returning of an [Iterator] is supported.
 ///
 /// User must specify the item type in the rule in the form of `Iterator<X>`.
 ///
-/// Due to technical difficulties, this rule only supports marshaling a `MarshalingIterator` and
-/// only in the return posigion.
+/// Due to technical difficulties, this rule only supports marshaling an [Iterator] wrapped in a
+/// [Box] or a [Result]. See `riko_runtime::iterators::IntoReturned` for explanation.
 ///
 /// ## Errors and Nullness
 ///
