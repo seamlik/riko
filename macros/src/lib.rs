@@ -127,7 +127,7 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     item
 }
 
-/// Generates language bindings for a Rust type allocated in the heap.
+/// Generates language bindings for a Rust type allocated on the heap.
 ///
 /// Deriving this trait allows code on the target side to construct an object and put it on the
 /// heap. This is achieved by creating a global object pool dedicated to the type deriving the

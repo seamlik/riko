@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
 
-/// Object allocated in the heap.
+/// Object allocated on the heap.
 ///
 /// These objects are allocated and freed on the Rust side while only expose a reference to the
 /// target side. Target code must integrate the manual memory management into its own mechanism as
