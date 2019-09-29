@@ -39,6 +39,7 @@ use syn::ItemStruct;
 ///
 /// The following marshaling rules are supported:
 ///
+/// * Bool
 /// * Bytes
 /// * I8
 /// * I32

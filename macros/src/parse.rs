@@ -98,6 +98,7 @@ impl Parse for Fun {
 
 #[derive(EnumString, Debug, PartialEq)]
 pub enum MarshalingRule {
+    Bool,
     Bytes,
     I8,
     I32,
@@ -133,6 +134,7 @@ impl MarshalingRule {
 
     pub fn to_rust_return_type(&self) -> syn::Result<Type> {
         match self {
+            Self::Bool => Ok(syn::parse_quote! { bool }),
             Self::Bytes => Ok(syn::parse_quote! { ::std::vec::Vec<u8> }),
             Self::I8 => Ok(syn::parse_quote! { i8 }),
             Self::I32 => Ok(syn::parse_quote! { i32 }),
