@@ -113,7 +113,7 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
 
     let mut generated = Vec::<TokenStream>::new();
     if config.jni.enabled {
-        generated.push(jni::Bindgen::new(&config).gen_fun(&subject, &args));
+        generated.push(jni::Bindgen::new(&config).fun(&subject, &args));
     }
 
     item.extend(generated);
@@ -133,15 +133,15 @@ pub fn derive_heap(item: TokenStream) -> TokenStream {
     }
 
     let item_struct = syn::parse_macro_input!(item as ItemStruct);
-    jni::Bindgen::new(&config).gen_heaped(&item_struct)
+    jni::Bindgen::new(&config).heaped(&item_struct)
 }
 
 /// Language binding generator.
 trait Bindgen<'cfg> {
     fn new(config: &'cfg Config) -> Self;
     fn config(&self) -> &'cfg Config;
-    fn gen_heaped(&self, item: &ItemStruct) -> TokenStream;
-    fn gen_fun(&self, item: &FunSubject, args: &Fun) -> TokenStream;
+    fn heaped(&self, item: &ItemStruct) -> TokenStream;
+    fn fun(&self, item: &FunSubject, args: &Fun) -> TokenStream;
 }
 
 /// Item on which a `#[fun]` can be applied.
