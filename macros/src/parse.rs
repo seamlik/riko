@@ -1,8 +1,10 @@
 //! Syntax tree parsing.
 
+use quote::ToTokens;
 use std::convert::TryFrom;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::result::Result;
-use strum_macros::EnumString;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
@@ -15,11 +17,13 @@ use syn::LitStr;
 use syn::Meta;
 use syn::NestedMeta;
 use syn::ParenthesizedGenericArguments;
+use syn::Path;
 use syn::PathArguments;
 use syn::PathSegment;
 use syn::ReturnType;
 use syn::Token;
 use syn::Type;
+use syn::TypePath;
 
 #[derive(Default, Debug, PartialEq)]
 pub struct MarshalingSignature {
@@ -57,7 +61,7 @@ impl Parse for MarshalingSignature {
             ReturnType::Type(_, r#type) => {
                 let candidate = MarshalingRule::from_type(&r#type)?;
                 match &candidate {
-                    MarshalingRule::Serde(inner) if inner.is_empty() => {
+                    MarshalingRule::Serde(inner) if inner.segments.is_empty() => {
                         return Err(syn::Error::new(
                             sig_raw.output.span(),
                             "Must specify the type for `Serde` in the return position.",
@@ -112,7 +116,6 @@ impl Parse for Fun {
     }
 }
 
-#[derive(EnumString, Debug, PartialEq)]
 pub enum MarshalingRule {
     Bool,
     Bytes,
@@ -120,7 +123,7 @@ pub enum MarshalingRule {
     I32,
     I64,
     Iterator(String),
-    Serde(String),
+    Serde(Path),
     String,
 }
 
@@ -129,41 +132,103 @@ const ERROR_MARSHALING_RULE_INVALID: &str = "Must be one of the variants of `Mar
 const ERROR_MARSHALING_RULE_BAD_NUMBER_OF_TYPE_ARGS: &str = "Too many type arguments.";
 
 impl MarshalingRule {
+    fn from_name_without_inner(src: &Ident) -> syn::Result<Self> {
+        match src.to_string().as_str() {
+            "Bool" => Ok(Self::Bool),
+            "Bytes" => Ok(Self::Bytes),
+            "I8" => Ok(Self::I8),
+            "I32" => Ok(Self::I32),
+            "I64" => Ok(Self::I64),
+            "Iterator" => Ok(Self::Iterator(String::default())),
+            "Serde" => Ok(Self::Serde(Path {
+                leading_colon: None,
+                segments: Punctuated::new(),
+            })),
+            "String" => Ok(Self::String),
+            _ => Err(syn::Error::new(
+                src.span(),
+                format!("Invalid marshaling rule: {}", src.to_token_stream()),
+            )),
+        }
+    }
+
     fn from_type(src: &Type) -> syn::Result<Self> {
         let segment = assert_type_no_prefix(src)?;
         Self::from_pathsegment(segment)
     }
 
     fn from_pathsegment(src: &PathSegment) -> syn::Result<Self> {
-        let mut result = src
-            .ident
-            .to_string()
-            .parse()
-            .map_err(|err: strum::ParseError| syn::Error::new(src.span(), err.to_string()))?;
-        let ident_to_inner = || {
-            assert_patharguments_clean(&src.arguments).map(|it| match it {
-                Some(ident) => ident.to_string(),
-                None => String::default(),
-            })
+        let error = || {
+            Err(syn::Error::new(
+                src.span(),
+                format!(
+                    "Must specify the type for this rule: {}",
+                    src.to_token_stream()
+                ),
+            ))
         };
+        let mut result = Self::from_name_without_inner(&src.ident)?;
         if let Self::Serde(ref mut inner) = result {
-            *inner = ident_to_inner()?;
+            if let Some(path) = assert_patharguments_is_path(&src.arguments)? {
+                *inner = path.clone()
+            } else {
+                return error();
+            }
         } else if let Self::Iterator(ref mut inner) = result {
-            *inner = ident_to_inner()?;
+            if let Some(ident) = assert_patharguments_clean(&src.arguments)? {
+                *inner = ident.to_string();
+            } else {
+                return error();
+            }
         }
         Ok(result)
     }
 
-    pub fn to_rust_return_type(&self) -> syn::Result<Type> {
+    pub fn to_rust_return_type(&self) -> Type {
         match self {
-            Self::Bool => Ok(syn::parse_quote! { bool }),
-            Self::Bytes => Ok(syn::parse_quote! { ::std::vec::Vec<u8> }),
-            Self::I8 => Ok(syn::parse_quote! { i8 }),
-            Self::I32 => Ok(syn::parse_quote! { i32 }),
-            Self::I64 => Ok(syn::parse_quote! { i64 }),
-            Self::Iterator(_) => Ok(syn::parse_quote! { _ }),
-            Self::Serde(inner) => syn::parse_str(inner),
-            Self::String => Ok(syn::parse_quote! { ::std::string::String }),
+            Self::Bool => syn::parse_quote! { bool },
+            Self::Bytes => syn::parse_quote! { ::std::vec::Vec<u8> },
+            Self::I8 => syn::parse_quote! { i8 },
+            Self::I32 => syn::parse_quote! { i32 },
+            Self::I64 => syn::parse_quote! { i64 },
+            Self::Iterator(_) => syn::parse_quote! { _ },
+            Self::Serde(inner) => Type::Path(TypePath {
+                qself: None,
+                path: inner.clone(),
+            }),
+            Self::String => syn::parse_quote! { ::std::string::String },
+        }
+    }
+
+impl PartialEq for MarshalingRule {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Bool, Self::Bool) => true,
+            (Self::Bytes, Self::Bytes) => true,
+            (Self::I32, Self::I32) => true,
+            (Self::I64, Self::I64) => true,
+            (Self::I8, Self::I8) => true,
+            (Self::Iterator(left), Self::Iterator(right)) => left == right,
+            (Self::String, Self::String) => true,
+            (Self::Serde(left), Self::Serde(right)) => {
+                left.to_token_stream().to_string() == right.to_token_stream().to_string()
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Debug for MarshalingRule {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Bool => write!(f, "Bool"),
+            Self::Bytes => write!(f, "Bytes"),
+            Self::I8 => write!(f, "I8"),
+            Self::I32 => write!(f, "I32"),
+            Self::I64 => write!(f, "I64"),
+            Self::Iterator(inner) => write!(f, "Iterator {{ {:?} }}", inner),
+            Self::Serde(inner) => write!(f, "Serde {{ {:?} }}", inner.to_token_stream()),
+            Self::String => write!(f, "String"),
         }
     }
 }
@@ -204,6 +269,7 @@ fn assert_type_clean(src: &Type) -> syn::Result<&Ident> {
     }
 }
 
+/// Asserts `<XXX>` contains a type of the simplest form (e.g. `Foo`).
 fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>> {
     match &src {
         PathArguments::None => Ok(None),
@@ -228,6 +294,33 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>
             }
         }
         _ => Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE)),
+    }
+}
+
+// Asserts `<XXX>` contains exactly a [Path].
+fn assert_patharguments_is_path(src: &PathArguments) -> syn::Result<Option<&Path>> {
+    let error = || {
+        Err(syn::Error::new(
+            src.span(),
+            format!("Invalid path arguments: {}", src.to_token_stream()),
+        ))
+    };
+    match src {
+        PathArguments::None => Ok(None),
+        PathArguments::AngleBracketed(inner) => {
+            if inner.colon2_token.is_some() || inner.args.len() != 1 {
+                error()
+            } else if let GenericArgument::Type(Type::Path(path)) = inner.args.first().unwrap() {
+                if path.qself.is_some() {
+                    error()
+                } else {
+                    Ok(Some(&path.path))
+                }
+            } else {
+                error()
+            }
+        }
+        _ => error(),
     }
 }
 
@@ -265,14 +358,21 @@ mod tests {
 
     #[test]
     fn MarshalingSignature_serde() {
-        let actual = syn::parse_str::<MarshalingSignature>("(Serde) -> Serde<Info>").unwrap();
+        let actual = syn::parse_str::<MarshalingSignature>(
+            "(Serde<org::example::Love>) -> Serde<org::example::Life>",
+        )
+        .unwrap();
         assert_eq!(
             actual.inputs,
-            vec![MarshalingRule::Serde(String::default())]
+            vec![MarshalingRule::Serde(
+                syn::parse_quote! { org::example::Love }
+            )]
         );
         assert_eq!(
             actual.output,
-            Some(MarshalingRule::Serde("Info".to_owned()))
+            Some(MarshalingRule::Serde(
+                syn::parse_quote! { org::example::Life }
+            ))
         );
     }
 

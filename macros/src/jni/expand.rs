@@ -1,7 +1,6 @@
 use crate::parse::Fun;
 use proc_macro2::TokenStream;
 use quote::quote;
-use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::FnArg;
 use syn::Ident;
@@ -85,10 +84,7 @@ pub fn fun(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
     };
     let result_block_invocation = match &args.sig.output {
         Some(output) => {
-            let output_type = output
-                .to_rust_return_type()
-                .map(ToTokens::into_token_stream)
-                .unwrap_or_else(|err| err.to_compile_error());
+            let output_type = output.to_rust_return_type();
             quote! {
                 let result: ::riko_runtime::returned::Returned< #output_type > = #original_name(
                     #(#result_args_invoked),*
