@@ -8,7 +8,6 @@ use std::result::Result;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 use syn::AttributeArgs;
 use syn::FnArg;
 use syn::GenericArgument;
@@ -138,10 +137,9 @@ impl TryFrom<AttributeArgs> for Fun {
                     Some(name) if name == "sig" => {
                         result.sig = assert_lit_is_litstr(&pair.lit)?.parse()?
                     }
-
-                    _ => return Err(syn::Error::new(pair.path.span(), "Unrecognized argument.")),
+                    _ => return Err(syn::Error::new_spanned(pair.path, "Unrecognized argument.")),
                 },
-                _ => return Err(syn::Error::new(arg.span(), "Not a key-value.")),
+                _ => return Err(syn::Error::new_spanned(arg, "Not a key-value.")),
             }
         }
         Ok(result)
@@ -186,8 +184,8 @@ impl MarshalingRule {
                 segments: Punctuated::new(),
             })),
             "String" => Ok(Self::String),
-            _ => Err(syn::Error::new(
-                src.span(),
+            _ => Err(syn::Error::new_spanned(
+                src,
                 format!("Invalid marshaling rule: {}", src.to_token_stream()),
             )),
         }
@@ -204,8 +202,8 @@ impl MarshalingRule {
 
     fn from_pathsegment(src: &PathSegment) -> syn::Result<Self> {
         let error = || {
-            Err(syn::Error::new(
-                src.span(),
+            Err(syn::Error::new_spanned(
+                src,
                 format!(
                     "Must specify the type for this rule: {}",
                     src.to_token_stream()
@@ -304,21 +302,24 @@ fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {
     if let Type::Path(path) = src {
         if path.qself.is_some() {
             // Self prefix
-            Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE))
+            Err(syn::Error::new_spanned(src, ERROR_MARSHALING_RULE_IMPURE))
         } else if let Some(colons) = path.path.leading_colon {
             // Leading colons
-            Err(syn::Error::new(colons.span(), ERROR_MARSHALING_RULE_IMPURE))
+            Err(syn::Error::new_spanned(
+                colons,
+                ERROR_MARSHALING_RULE_IMPURE,
+            ))
         } else if path.path.segments.len() != 1 {
             // 1 segment only
-            Err(syn::Error::new(
-                path.path.segments.span(),
+            Err(syn::Error::new_spanned(
+                &path.path.segments,
                 "Unknown marshaling rule.",
             ))
         } else {
             Ok(path.path.segments.first().unwrap())
         }
     } else {
-        Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE))
+        Err(syn::Error::new_spanned(src, ERROR_MARSHALING_RULE_IMPURE))
     }
 }
 
@@ -328,8 +329,8 @@ fn assert_type_clean(src: &Type) -> syn::Result<&Ident> {
     if segment.arguments.is_empty() {
         Ok(&segment.ident)
     } else {
-        Err(syn::Error::new(
-            segment.span(),
+        Err(syn::Error::new_spanned(
+            segment,
             ERROR_MARSHALING_RULE_IMPURE,
         ))
     }
@@ -339,7 +340,7 @@ fn assert_type_is_path(src: &Type) -> syn::Result<&Path> {
     if let Type::Path(type_path) = src {
         Ok(&type_path.path)
     } else {
-        Err(syn::Error::new(src.span(), "Expected a type path."))
+        Err(syn::Error::new_spanned(src, "Expected a type path."))
     }
 }
 
@@ -349,33 +350,30 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>
         PathArguments::None => Ok(None),
         PathArguments::AngleBracketed(ref args) => {
             if let Some(colon) = &args.colon2_token {
-                Err(syn::Error::new(colon.span(), ERROR_MARSHALING_RULE_IMPURE))
+                Err(syn::Error::new_spanned(colon, ERROR_MARSHALING_RULE_IMPURE))
             } else if args.args.len() != 1 {
-                Err(syn::Error::new(
-                    args.span(),
-                    "Expected 1 type argument.",
-                ))
+                Err(syn::Error::new_spanned(args, "Expected 1 type argument."))
             } else {
                 let first_arg = args.args.first().unwrap();
                 if let GenericArgument::Type(first_arg_type) = first_arg {
                     Ok(Some(assert_type_clean(&first_arg_type)?))
                 } else {
-                    Err(syn::Error::new(
-                        first_arg.span(),
+                    Err(syn::Error::new_spanned(
+                        first_arg,
                         ERROR_MARSHALING_RULE_IMPURE,
                     ))
                 }
             }
         }
-        _ => Err(syn::Error::new(src.span(), ERROR_MARSHALING_RULE_IMPURE)),
+        _ => Err(syn::Error::new_spanned(src, ERROR_MARSHALING_RULE_IMPURE)),
     }
 }
 
 // Asserts `<XXX>` contains exactly a [Path].
 fn assert_patharguments_is_path(src: &PathArguments) -> syn::Result<Option<&Path>> {
     let error = || {
-        Err(syn::Error::new(
-            src.span(),
+        Err(syn::Error::new_spanned(
+            src,
             format!("Invalid path arguments: {}", src.to_token_stream()),
         ))
     };
@@ -402,7 +400,7 @@ fn assert_lit_is_litstr(src: &Lit) -> syn::Result<&LitStr> {
     if let Lit::Str(litstr) = src {
         Ok(litstr)
     } else {
-        Err(syn::Error::new(src.span(), "Invalid value."))
+        Err(syn::Error::new_spanned(src, "Invalid value."))
     }
 }
 

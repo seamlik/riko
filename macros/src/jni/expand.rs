@@ -1,7 +1,6 @@
 use crate::parse::Fun;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
 use syn::FnArg;
 use syn::Ident;
 use syn::ItemUse;
@@ -71,8 +70,8 @@ pub fn fun(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
                 candidate
             }
         } else {
-            syn::Error::new(
-                arg_original.span(),
+            syn::Error::new_spanned(
+                arg_original,
                 "Does not support this kind of parameter.",
             )
             .to_compile_error()
