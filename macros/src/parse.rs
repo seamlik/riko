@@ -10,6 +10,7 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::AttributeArgs;
+use syn::FnArg;
 use syn::GenericArgument;
 use syn::Ident;
 use syn::Lit;
@@ -21,6 +22,7 @@ use syn::Path;
 use syn::PathArguments;
 use syn::PathSegment;
 use syn::ReturnType;
+use syn::Signature;
 use syn::Token;
 use syn::Type;
 use syn::TypePath;
@@ -32,6 +34,33 @@ pub struct MarshalingSignature {
 }
 
 impl MarshalingSignature {
+    pub fn is_empty(&self) -> bool {
+        self.inputs.is_empty() && self.output == None
+    }
+
+    /// Infers all rules.
+    ///
+    /// No [MarshalingRule::Infer] will be left in the signature.
+    pub fn infer(&mut self, sig: &Signature) -> syn::Result<()> {
+        if let ReturnType::Type(_, output_type) = &sig.output {
+            for rule in self.output.iter_mut() {
+                rule.infer(output_type)?;
+            }
+        } else {
+            self.output = None;
+        }
+
+        for (i, rule) in self.inputs.iter_mut().enumerate() {
+            if let FnArg::Typed(inner) = &sig.inputs[i] {
+                rule.infer(&inner.ty)?;
+            } else {
+                unimplemented!("`#[fun]` on a method not implemented!");
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn has_iterators(&self) -> bool {
         if let Some(MarshalingRule::Iterator(_)) = self.output {
             true
@@ -58,18 +87,7 @@ impl Parse for MarshalingSignature {
 
         let output = match &sig_raw.output {
             ReturnType::Default => None,
-            ReturnType::Type(_, r#type) => {
-                let candidate = MarshalingRule::from_type(&r#type)?;
-                match &candidate {
-                    MarshalingRule::Serde(inner) if inner.segments.is_empty() => {
-                        return Err(syn::Error::new(
-                            sig_raw.output.span(),
-                            "Must specify the type for `Serde` in the return position.",
-                        ));
-                    }
-                    _ => Some(candidate),
-                }
-            }
+            ReturnType::Type(_, t) => Some(MarshalingRule::from_type(&t)?),
         };
 
         Ok(Self { inputs, output })
@@ -81,6 +99,29 @@ impl Parse for MarshalingSignature {
 pub struct Fun {
     pub name: String,
     pub sig: MarshalingSignature,
+}
+
+impl Fun {
+    /// Fills in all optional fields by consulting a function signature.
+    pub fn complete(&mut self, sig: &Signature) -> syn::Result<()> {
+        // name
+        if self.name.is_empty() {
+            self.name = sig.ident.to_string();
+        }
+
+        // sig
+        if self.sig.is_empty() {
+            if let ReturnType::Type(_, _) = sig.output {
+                self.sig.output = Some(MarshalingRule::Infer);
+            }
+            sig.inputs
+                .iter()
+                .for_each(|_| self.sig.inputs.push(MarshalingRule::Infer));
+        }
+        self.sig.infer(sig)?;
+
+        Ok(())
+    }
 }
 
 impl TryFrom<AttributeArgs> for Fun {
@@ -122,14 +163,14 @@ pub enum MarshalingRule {
     I8,
     I32,
     I64,
+    Infer,
     Iterator(String),
     Serde(Path),
     String,
 }
 
+pub const ERROR_MARSHALING_RULE_UNINFERRED: &str = "Must infer this rule first!";
 const ERROR_MARSHALING_RULE_IMPURE: &str = "Must not add any other decoration to the type.";
-const ERROR_MARSHALING_RULE_INVALID: &str = "Must be one of the variants of `MarshalingRule`.";
-const ERROR_MARSHALING_RULE_BAD_NUMBER_OF_TYPE_ARGS: &str = "Too many type arguments.";
 
 impl MarshalingRule {
     fn from_name_without_inner(src: &Ident) -> syn::Result<Self> {
@@ -153,8 +194,12 @@ impl MarshalingRule {
     }
 
     fn from_type(src: &Type) -> syn::Result<Self> {
-        let segment = assert_type_no_prefix(src)?;
-        Self::from_pathsegment(segment)
+        if let Type::Infer(_) = src {
+            Ok(Self::Infer)
+        } else {
+            let segment = assert_type_no_prefix(src)?;
+            Self::from_pathsegment(segment)
+        }
     }
 
     fn from_pathsegment(src: &PathSegment) -> syn::Result<Self> {
@@ -191,6 +236,7 @@ impl MarshalingRule {
             Self::I8 => syn::parse_quote! { i8 },
             Self::I32 => syn::parse_quote! { i32 },
             Self::I64 => syn::parse_quote! { i64 },
+            Self::Infer => panic!("{}", ERROR_MARSHALING_RULE_UNINFERRED),
             Self::Iterator(_) => syn::parse_quote! { _ },
             Self::Serde(inner) => Type::Path(TypePath {
                 qself: None,
@@ -199,6 +245,31 @@ impl MarshalingRule {
             Self::String => syn::parse_quote! { ::std::string::String },
         }
     }
+
+    pub fn infer(&mut self, t: &Type) -> syn::Result<()> {
+        if *self != Self::Infer {
+            return Ok(());
+        }
+
+        let type_path = match t {
+            Type::Reference(reference) => assert_type_is_path(&reference.elem),
+            _ => assert_type_is_path(t),
+        }?;
+        let type_path_no_leading_colons = type_path.segments.to_token_stream().to_string();
+
+        match type_path_no_leading_colons.as_str() {
+            "bool" => *self = Self::Bool,
+            "i32" => *self = Self::I32,
+            "i63" => *self = Self::I64,
+            "i8" => *self = Self::I8,
+            "std :: string :: String" | "String" => *self = Self::String,
+            "std :: vec :: Vec < u8 >" | "Vec < u8 >" => *self = Self::Bytes,
+            _ => *self = Self::Serde(type_path.clone()),
+            // TODO: Support Result & Option & Iterator
+        }
+        Ok(())
+    }
+}
 
 impl PartialEq for MarshalingRule {
     fn eq(&self, other: &Self) -> bool {
@@ -226,8 +297,9 @@ impl Debug for MarshalingRule {
             Self::I8 => write!(f, "I8"),
             Self::I32 => write!(f, "I32"),
             Self::I64 => write!(f, "I64"),
+            Self::Infer => write!(f, "_"),
             Self::Iterator(inner) => write!(f, "Iterator {{ {:?} }}", inner),
-            Self::Serde(inner) => write!(f, "Serde {{ {:?} }}", inner.to_token_stream()),
+            Self::Serde(inner) => write!(f, "Serde {{ {} }}", inner.to_token_stream()),
             Self::String => write!(f, "String"),
         }
     }
@@ -246,7 +318,7 @@ fn assert_type_no_prefix(src: &Type) -> syn::Result<&PathSegment> {
             // 1 segment only
             Err(syn::Error::new(
                 path.path.segments.span(),
-                ERROR_MARSHALING_RULE_INVALID,
+                "Unknown marshaling rule.",
             ))
         } else {
             Ok(path.path.segments.first().unwrap())
@@ -269,6 +341,14 @@ fn assert_type_clean(src: &Type) -> syn::Result<&Ident> {
     }
 }
 
+fn assert_type_is_path(src: &Type) -> syn::Result<&Path> {
+    if let Type::Path(type_path) = src {
+        Ok(&type_path.path)
+    } else {
+        Err(syn::Error::new(src.span(), "Expected a type path."))
+    }
+}
+
 /// Asserts `<XXX>` contains a type of the simplest form (e.g. `Foo`).
 fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>> {
     match &src {
@@ -278,8 +358,8 @@ fn assert_patharguments_clean(src: &PathArguments) -> syn::Result<Option<&Ident>
                 Err(syn::Error::new(colon.span(), ERROR_MARSHALING_RULE_IMPURE))
             } else if args.args.len() != 1 {
                 Err(syn::Error::new(
-                    args.args.span(),
-                    ERROR_MARSHALING_RULE_BAD_NUMBER_OF_TYPE_ARGS,
+                    args.span(),
+                    "Expected 1 type argument.",
                 ))
             } else {
                 let first_arg = args.args.first().unwrap();
@@ -434,5 +514,56 @@ mod tests {
             name = "function2"
         };
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn MarshalingRule_infer_bool() {
+        let mut actual = MarshalingRule::Infer;
+        actual.infer(&syn::parse_quote! { bool }).unwrap();
+        assert_eq!(MarshalingRule::Bool, actual)
+    }
+
+    #[test]
+    fn MarshalingRule_infer_string() {
+        let mut simplest = MarshalingRule::Infer;
+        simplest.infer(&syn::parse_quote! { String }).unwrap();
+        assert_eq!(MarshalingRule::String, simplest);
+
+        let mut full = MarshalingRule::Infer;
+        full.infer(&syn::parse_quote! { std::string::String })
+            .unwrap();
+        assert_eq!(MarshalingRule::String, full);
+
+        let mut leading_colon = MarshalingRule::Infer;
+        leading_colon
+            .infer(&syn::parse_quote! { ::std::string::String })
+            .unwrap();
+        assert_eq!(MarshalingRule::String, leading_colon);
+    }
+
+    #[test]
+    fn MarshalingRule_infer_bytes() {
+        let mut actual = MarshalingRule::Infer;
+        actual.infer(&syn::parse_quote! { Vec<u8> }).unwrap();
+        assert_eq!(MarshalingRule::Bytes, actual)
+    }
+
+    #[test]
+    fn MarshalingRule_infer_inferred() {
+        let mut actual = MarshalingRule::String;
+        actual.infer(&syn::parse_quote! { String }).unwrap();
+        assert_eq!(MarshalingRule::String, actual)
+    }
+
+    #[test]
+    fn MarshalingRule_infer_serde() {
+        let mut actual = MarshalingRule::Infer;
+        actual
+            .infer(&syn::parse_quote! { org::example::Love })
+            .unwrap();
+        assert_eq!(
+            MarshalingRule::Serde(syn::parse_quote! { org::example::Love }),
+            actual
+        )
     }
 }

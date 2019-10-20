@@ -8,7 +8,7 @@ fn nothing() {
     println!("A no-in no-out function.");
 }
 
-#[riko::fun(sig = "(I32, I32) -> I32")]
+#[riko::fun]
 fn _i32(a: i32, b: i32) -> i32 {
     a + b
 }
@@ -27,12 +27,18 @@ fn result_option(a: Option<i32>, b: Option<i32>) -> Result<Option<i32>, std::fmt
     }
 }
 
-#[riko::fun(sig = "(String, String) -> Iterator<String>")]
+#[riko::fun]
+fn reference(a: &String, b: &String) -> String {
+    let result = a.clone();
+    result + b
+}
+
+#[riko::fun(sig = "(_, _) -> Iterator<String>")]
 fn iterator(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
     Box::new(vec![a, b].into_iter())
 }
 
-#[riko::fun(sig = "(String, Bool) -> Iterator<String>")]
+#[riko::fun(sig = "(_, _) -> Iterator<String>")]
 fn iterator_fallible(
     item: String,
     fails: bool,

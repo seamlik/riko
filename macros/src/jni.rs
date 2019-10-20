@@ -12,10 +12,7 @@ pub struct Bindgen<'cfg> {
 
 impl<'cfg> crate::Bindgen<'cfg> for Bindgen<'cfg> {
     fn fun(&self, item: &FunSubject, args: &Fun) -> TokenStream {
-        let signature = match item {
-            FunSubject::Function(inner) => &inner.sig,
-        };
-        expand::fun(signature, args, &self.config().module).into()
+        expand::fun(item.signature(), args, &self.config().module).into()
     }
 
     fn new(config: &'cfg Config) -> Self {

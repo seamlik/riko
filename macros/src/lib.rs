@@ -11,10 +11,9 @@ mod parse;
 use crate::config::Config;
 use parse::Fun;
 use proc_macro::TokenStream;
-use std::convert::TryInto;
-use syn::AttributeArgs;
 use syn::ItemFn;
 use syn::ItemStruct;
+use syn::Signature;
 
 /// Generates language bindings for a function.
 ///
@@ -27,17 +26,12 @@ use syn::ItemStruct;
 ///   "Marshaling Rules" below.
 /// * `name`: Symbol name used when exporting the item, convenient for avoiding name clashes.
 ///
-/// # Marshaling Rules
+/// # Marshaling Rules and Signatures
 ///
-/// Since procedural macros can only analyse a syntax tree and have no access to any type
-/// information, it is impossible to acurrately determine what marshaling rules to use for each
-/// parameters and return type of a function. Therefore, user must specify the marshaling rules
-/// manually.
-///
-/// The syntax of a marshaling signature is the same as the signature of a closure, e.g.
-/// `(A, B) -> C`. Each component in the signature must be one of the "marshaling rules".
-///
-/// The following marshaling rules are supported:
+/// A marshaling signature is necessary in order to specify how to marshal the parameters and the
+/// returned data of a function across the FFI boundary. The syntax of a marshaling signature is the
+/// same as the signature of a closure, e.g. `(A, B) -> C`. Each of its component is a marshaling
+/// rule. The following rules are supported:
 ///
 /// * `Bool`
 /// * `Bytes`
@@ -48,13 +42,25 @@ use syn::ItemStruct;
 /// * `Serde`
 /// * `String`
 ///
-/// These rules specify how the data is copied and sent between the FFI boundary. For example, `I32`
-/// means the data will be serialized as a 32-bit integer, and will be deserialized as an `int` on
-/// the Java side.
+/// Most of them are self-explanatory. For example, `I32` means the data will be serialized as a
+/// 32-bit integer, and will be deserialized as an `int` on the Java side.
 ///
 /// For now, the rules are a bit limiting (no unsigned integers, for example). This is
 /// because we only want to make sure they work with all target languages (Java does not have
 /// unsigned integers, for example).
+///
+/// ## Rule Inference
+///
+/// Most of time, the macros can guess what rules should be applied on a function if a built-in type
+/// is used. When using the `Serde` rule, a fully-qualified type path must be specify in the
+/// function so that the macro can generate the correct target code.
+///
+/// To let the macro infer a rule in a marshaling signature, use `_` just like the type inferece.
+/// To infer the whole signature, simply obmit the entire `sig` parameter.
+///
+/// Since procedural macros can only analyse a syntax tree and have no access to any type
+/// information, it is impossible to always acurrately infer the rule. When the inference causes
+/// compiler errors or a type alias is used, specify the rule explicitly.
 ///
 /// ## `Bytes`
 ///
@@ -101,15 +107,14 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
         return item;
     }
 
-    let args: Fun = syn::parse_macro_input!(attr as AttributeArgs)
-        .try_into()
-        .expect("Failed to parse attribute arguments.");
-
     let subject = if let Ok(item_fn) = syn::parse::<ItemFn>(item.clone()) {
         FunSubject::Function(item_fn)
     } else {
         panic!("Applied to an unsupported language item.")
     };
+
+    let mut args: Fun = syn::parse_macro_input!(attr as Fun);
+    args.complete(subject.signature()).unwrap();
 
     let mut generated = Vec::<TokenStream>::new();
     if config.jni.enabled {
@@ -147,4 +152,12 @@ trait Bindgen<'cfg> {
 /// Item on which a `#[fun]` can be applied.
 enum FunSubject {
     Function(ItemFn),
+}
+
+impl FunSubject {
+    pub fn signature(&self) -> &Signature {
+        match self {
+            Self::Function(inner) => &inner.sig,
+        }
+    }
 }
