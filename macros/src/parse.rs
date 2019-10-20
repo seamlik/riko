@@ -274,17 +274,11 @@ impl MarshalingRule {
 impl PartialEq for MarshalingRule {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Bool, Self::Bool) => true,
-            (Self::Bytes, Self::Bytes) => true,
-            (Self::I32, Self::I32) => true,
-            (Self::I64, Self::I64) => true,
-            (Self::I8, Self::I8) => true,
             (Self::Iterator(left), Self::Iterator(right)) => left == right,
-            (Self::String, Self::String) => true,
             (Self::Serde(left), Self::Serde(right)) => {
                 left.to_token_stream().to_string() == right.to_token_stream().to_string()
             }
-            _ => false,
+            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
         }
     }
 }
