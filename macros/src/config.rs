@@ -105,6 +105,48 @@ impl Config {
 
         Ok(())
     }
+
+    /// Gets the module path of a [Span] according to its source file path.
+    ///
+    /// The result will not be correct if the actual module is a sub-module inside a source file.
+    pub fn module_by_span(&self, span: Span) -> syn::Result<Vec<String>> {
+        let source_file = root_span(span.unwrap()).source_file();
+        if self.crate_name.is_empty() {
+            Err(syn::Error::new(span, "Unknown crate name."))
+        } else if !source_file.is_real() {
+            Err(syn::Error::new(span, "Source file is not real."))
+        } else if let Some(crate_path) = self.entry.parent() {
+            let source_file_path = source_file.path().canonicalize().map_err(|_| {
+                syn::Error::new(span, format!("Invalid source file path: {:?}", source_file))
+            })?;
+
+            // Crate root
+            if source_file_path == self.entry {
+                return Ok(vec![self.crate_name.clone()]);
+            }
+
+            let mut result: Vec<String> = source_file_path
+                .strip_prefix(crate_path)
+                .map_err(|_| {
+                    syn::Error::new(
+                        span,
+                        format!("Source file outside of current crate: {:?}", source_file),
+                    )
+                })?
+                .iter()
+                .map(|it| it.to_str().unwrap().into())
+                .collect();
+            result.insert(0, self.crate_name.clone());
+            let mut last = result.pop().unwrap();
+            if last != "mod.rs" && last.ends_with(".rs") {
+                last = last.trim_end_matches(".rs").into();
+                result.push(last);
+            }
+            Ok(result)
+        } else {
+            Err(syn::Error::new(span, "Unknown crate entry."))
+        }
+    }
 }
 
 #[derive(Deserialize, Default)]

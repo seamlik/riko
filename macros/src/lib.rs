@@ -24,9 +24,23 @@ const ERROR_CONFIG: &str = "Failed to read the config.";
 ///
 /// # Parameters
 ///
-/// * `sig`: Marshaling signature. Defaults to an empty signature, i.e. no input or output. See
-///   "Marshaling Rules" below.
+/// All parameters are optional.
+///
+/// * `module`: Module path of the function.
 /// * `name`: Symbol name used when exporting the item, convenient for avoiding name clashes.
+/// * `sig`: Marshaling signature.
+///
+/// # Module Path
+///
+/// The module path is used to determind the namespace (or a similar concept) of the function on
+/// which the attribute applies. For example, a function in a crate `samples` with a module path
+/// `samples::utils` will generate a Java static method in the package `samples.utils`.
+///
+/// Keyword `crate` at the head of the module path is supported.
+///
+/// When obmitted, the crate name will be read from `Cargo.toml` and the module path will be
+/// guessed from the file path to the source code. In case of a functions in a sub-module inside a
+/// source file, this parameter must be set explicitly.
 ///
 /// # Marshaling Rules and Signatures
 ///

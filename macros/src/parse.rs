@@ -1,5 +1,6 @@
 //! Syntax tree parsing.
 
+use crate::config::Config;
 use quote::ToTokens;
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -8,6 +9,7 @@ use std::result::Result;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::AttributeArgs;
 use syn::FnArg;
 use syn::GenericArgument;
@@ -96,13 +98,14 @@ impl Parse for MarshalingSignature {
 /// Represents a `#[fun]`.
 #[derive(Default, Debug, PartialEq)]
 pub struct Fun {
+    pub module: Vec<String>,
     pub name: String,
     pub sig: MarshalingSignature,
 }
 
 impl Fun {
     /// Fills in all optional fields by consulting a function signature.
-    pub fn complete(&mut self, sig: &Signature) -> syn::Result<()> {
+    pub fn expand_all_fields(&mut self, sig: &Signature, config: &Config) -> syn::Result<()> {
         // name
         if self.name.is_empty() {
             self.name = sig.ident.to_string();
@@ -118,6 +121,9 @@ impl Fun {
                 .for_each(|_| self.sig.inputs.push(MarshalingRule::Infer));
         }
         self.sig.infer(sig)?;
+
+        // module
+        self.module = config.module_by_span(sig.span())?;
 
         Ok(())
     }
@@ -135,7 +141,14 @@ impl TryFrom<AttributeArgs> for Fun {
                         result.name = assert_lit_is_litstr(&pair.lit)?.value();
                     }
                     Some(name) if name == "sig" => {
-                        result.sig = assert_lit_is_litstr(&pair.lit)?.parse()?
+                        result.sig = assert_lit_is_litstr(&pair.lit)?.parse()?;
+                    }
+                    Some(name) if name == "module" => {
+                        result.module = assert_lit_is_litstr(&pair.lit)?
+                            .value()
+                            .split("::")
+                            .map(Into::into)
+                            .collect();
                     }
                     _ => return Err(syn::Error::new_spanned(pair.path, "Unrecognized argument.")),
                 },
@@ -500,10 +513,12 @@ mod tests {
                 inputs: vec![MarshalingRule::I32],
                 output: Some(MarshalingRule::I32),
             },
+            module: vec!["org".into(), "example".into()],
         };
         let actual: Fun = syn::parse_quote! {
             sig = "(I32) -> I32",
-            name = "function2"
+            name = "function2",
+            module = "org::example"
         };
         assert_eq!(expected, actual);
     }

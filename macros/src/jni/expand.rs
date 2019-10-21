@@ -1,4 +1,5 @@
 use crate::parse::Fun;
+use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::FnArg;
@@ -31,13 +32,13 @@ pub fn heaped(name: &Ident) -> TokenStream {
 /// # Parameters
 ///
 /// * `args`: Must be a complete version with all optional fields filled in.
-pub fn fun(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
+pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     // Global defs
     let has_iterators = args.sig.has_iterators();
 
     // Name of the generated function
     let original_name = &sig.ident;
-    let result_name = mangle_function(&args.name, module);
+    let result_name = mangle_function(&args.name, args.module.iter());
 
     // `use` statements
     let mut result_uses = Vec::<ItemUse>::new();
@@ -70,11 +71,8 @@ pub fn fun(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
                 candidate
             }
         } else {
-            syn::Error::new_spanned(
-                arg_original,
-                "Does not support this kind of parameter.",
-            )
-            .to_compile_error()
+            syn::Error::new_spanned(arg_original, "Does not support this kind of parameter.")
+                .to_compile_error()
         };
         result_args_invoked.push(arg_invoked);
     }
@@ -118,14 +116,14 @@ pub fn fun(sig: &Signature, args: &Fun, module: &str) -> TokenStream {
 }
 
 /// Transform a function's original name to the one used by JNI.
-fn mangle_function(name: &str, module: &str) -> Ident {
-    let mut module_mangled = module.replace("_", "_1").replace("::", "_");
-    if !module.is_empty() {
+fn mangle_function<'a>(name: &str, module: impl Iterator<Item = &'a String>) -> Ident {
+    let mut module_mangled = module.map(|it| it.replace("_", "_1")).join("_");
+    if !module_mangled.is_empty() {
         module_mangled.push_str("_");
     }
 
     quote::format_ident!(
-        "Java_{}Module__1_1riko_1{}",
+        "Java_{}_1_1Riko_1Module__1_1riko_1{}",
         module_mangled,
         name.replace("_", "_1")
     )
@@ -137,12 +135,12 @@ mod tests {
     #[test]
     fn mangle_function() {
         assert_eq!(
-            "Java_org_examples_Module__1_1riko_1run",
-            super::mangle_function("run", "org::examples").to_string()
+            "Java_org_example__1_1Riko_1Module__1_1riko_1run",
+            super::mangle_function("run", vec!["org".into(), "example".into()].iter()).to_string()
         );
         assert_eq!(
-            "Java_Module__1_1riko_1run",
-            super::mangle_function("run", "").to_string()
+            "Java__1_1Riko_1Module__1_1riko_1run",
+            super::mangle_function("run", std::iter::empty()).to_string()
         );
     }
 
@@ -151,13 +149,15 @@ mod tests {
         let function: syn::ItemFn = syn::parse_quote! {
             fn function() {}
         };
-        let mut args = Fun::default();
-        args.complete(&function.sig).unwrap();
+        let args: Fun = syn::parse_quote! {
+            module = "samples",
+            name = "function",
+        };
 
-        let actual = fun(&function.sig, &args, "").to_string();
+        let actual = fun(&function.sig, &args).to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_Module__1_1riko_1function(
+            pub extern "C" fn Java_samples__1_1Riko_1Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass
             ) {
@@ -176,15 +176,16 @@ mod tests {
                 unimplemented!()
             }
         };
-        let mut args: Fun = syn::parse_quote! {
-            sig = "(String, String) -> String"
+        let args: Fun = syn::parse_quote! {
+            module = "samples",
+            name = "function",
+            sig = "(String, String) -> String",
         };
-        args.complete(&function.sig).unwrap();
 
-        let actual = fun(&function.sig, &args, "").to_string();
+        let actual = fun(&function.sig, &args).to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_Module__1_1riko_1function(
+            pub extern "C" fn Java_samples__1_1Riko_1Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass,
                 arg_0_jni: ::jni::sys::jbyteArray,
@@ -209,15 +210,16 @@ mod tests {
                 unimplemented!()
             }
         };
-        let mut args: Fun = syn::parse_quote! {
-            sig = "(String, String) -> Iterator<String>"
+        let args: Fun = syn::parse_quote! {
+            module = "samples",
+            name = "function",
+            sig = "(String, String) -> Iterator<String>",
         };
-        args.complete(&function.sig).unwrap();
 
-        let actual = fun(&function.sig, &args, "").to_string();
+        let actual = fun(&function.sig, &args).to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_Module__1_1riko_1function(
+            pub extern "C" fn Java_samples__1_1Riko_1Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass,
                 arg_0_jni: ::jni::sys::jbyteArray,
