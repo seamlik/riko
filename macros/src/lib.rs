@@ -15,6 +15,8 @@ use syn::ItemFn;
 use syn::ItemStruct;
 use syn::Signature;
 
+const ERROR_CONFIG: &str = "Failed to read the config.";
+
 /// Generates language bindings for a function.
 ///
 /// This attribute only applies on a
@@ -102,7 +104,7 @@ use syn::Signature;
 /// For returned types, only owned types are supported.
 #[proc_macro_attribute]
 pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
-    let config = config::current();
+    let config = config::current().expect(ERROR_CONFIG);
     if !config.enabled {
         return item;
     }
@@ -114,7 +116,8 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     };
 
     let mut args: Fun = syn::parse_macro_input!(attr as Fun);
-    args.complete(subject.signature()).unwrap();
+    args.expand_all_fields(subject.signature(), &config)
+        .unwrap();
 
     let mut generated = Vec::<TokenStream>::new();
     if config.jni.enabled {
@@ -132,7 +135,7 @@ pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
 /// trait.
 #[proc_macro_derive(Heaped)]
 pub fn derive_heap(item: TokenStream) -> TokenStream {
-    let config = config::current();
+    let config = config::current().expect(ERROR_CONFIG);
     if !config.enabled {
         return TokenStream::new();
     }
