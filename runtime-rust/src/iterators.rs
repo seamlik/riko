@@ -8,12 +8,11 @@ use crate::returned::Returned;
 use jni::objects::JClass;
 use jni::sys::jbyteArray;
 use jni::JNIEnv;
+use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::error::Error;
 
-lazy_static::lazy_static! {
-    static ref POOL: SimplePool<ReturningIterator> = Default::default();
-}
+static POOL: Lazy<SimplePool<ReturningIterator>> = Lazy::new(|| Default::default());
 
 /// [Iterator] to be used by the target code.
 ///

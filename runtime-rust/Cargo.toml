@@ -10,7 +10,7 @@ version = "0.0.1"
 
 [dependencies]
 jni = "0.13"
-lazy_static = "1.4.0"
+once_cell = "1"
 rand = "0.7"
 serde = { version = "1.0.98", features = ["derive"] }
 serde_cbor = "0.10.1"

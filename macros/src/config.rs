@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use proc_macro2::Span;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -7,11 +8,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-lazy_static::lazy_static! {
-    static ref CONFIGS: Mutex<HashMap<PathBuf, Arc<Config>>> = Mutex::new(
-        std::iter::once(Default::default()).collect()
-    );
-}
+static CONFIGS: Lazy<Mutex<HashMap<PathBuf, Arc<Config>>>> =
+    Lazy::new(|| Mutex::new(std::iter::once(Default::default()).collect()));
 
 const CONFIG_FILENAME: &str = "Riko.toml";
 

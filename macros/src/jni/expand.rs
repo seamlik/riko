@@ -19,10 +19,10 @@ pub fn heaped(name: &Ident) -> TokenStream {
             }
         }
 
-        ::lazy_static::lazy_static! {
-            #[allow(non_upper_case_globals)]
-            static ref #pool_name: ::riko_runtime::heap::SimplePool<#name> = ::std::default::Default::default();
-        }
+        #[allow(non_upper_case_globals)]
+        static #pool_name: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<#name>> = ::once_cell::sync::Lazy::new(
+            || ::std::default::Default::default()
+        );
     };
     result
 }
@@ -255,10 +255,10 @@ mod tests {
                 }
             }
 
-            ::lazy_static::lazy_static! {
-                #[allow(non_upper_case_globals)]
-                static ref __RIKO_POOL_NuclearReactor: ::riko_runtime::heap::SimplePool<NuclearReactor> = ::std::default::Default::default();
-            }
+            #[allow(non_upper_case_globals)]
+            static __RIKO_POOL_NuclearReactor: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<NuclearReactor>> = ::once_cell::sync::Lazy::new(
+                || ::std::default::Default::default()
+            );
         }.to_string();
 
         assert_eq!(expected, actual);
