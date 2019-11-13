@@ -13,7 +13,6 @@ use parse::Fun;
 use proc_macro::TokenStream;
 use syn::ItemFn;
 use syn::ItemStruct;
-use syn::Signature;
 
 const ERROR_CONFIG: &str = "Failed to read the config.";
 
@@ -117,29 +116,25 @@ const ERROR_CONFIG: &str = "Failed to read the config.";
 ///
 /// For returned types, only owned types are supported.
 #[proc_macro_attribute]
-pub fn fun(attr: TokenStream, mut item: TokenStream) -> TokenStream {
+pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
     let config = config::current().expect(ERROR_CONFIG);
     if !config.enabled {
         return item;
     }
 
-    let subject = if let Ok(item_fn) = syn::parse::<ItemFn>(item.clone()) {
-        FunSubject::Function(item_fn)
-    } else {
-        panic!("Applied to an unsupported language item.")
-    };
+    let mut result = item.clone();
+    let subject = syn::parse_macro_input!(item as ItemFn);
 
     let mut args: Fun = syn::parse_macro_input!(attr as Fun);
-    args.expand_all_fields(subject.signature(), &config)
-        .unwrap();
+    args.expand_all_fields(&subject.sig, &config).unwrap();
 
     let mut generated = Vec::<TokenStream>::new();
     if config.jni.enabled {
         generated.push(jni::Bindgen::new(&config).fun(&subject, &args));
     }
 
-    item.extend(generated);
-    item
+    result.extend(generated);
+    result
 }
 
 /// Generates language bindings for a Rust type allocated on the heap.
@@ -163,18 +158,5 @@ trait Bindgen<'cfg> {
     fn new(config: &'cfg Config) -> Self;
     fn config(&self) -> &'cfg Config;
     fn heaped(&self, item: &ItemStruct) -> TokenStream;
-    fn fun(&self, item: &FunSubject, args: &Fun) -> TokenStream;
-}
-
-/// Item on which a `#[fun]` can be applied.
-enum FunSubject {
-    Function(ItemFn),
-}
-
-impl FunSubject {
-    pub fn signature(&self) -> &Signature {
-        match self {
-            Self::Function(inner) => &inner.sig,
-        }
-    }
+    fn fun(&self, item: &ItemFn, args: &Fun) -> TokenStream;
 }
