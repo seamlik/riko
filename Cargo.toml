@@ -2,5 +2,5 @@
 members = [
   "macros",
   "runtime-rust",
-  "samples/rust"
+  "sample/rust"
 ]

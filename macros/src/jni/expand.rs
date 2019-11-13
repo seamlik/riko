@@ -43,7 +43,7 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     // `use` statements
     let mut result_uses = Vec::<ItemUse>::new();
     if has_iterators {
-        result_uses.push(syn::parse_quote! { use ::riko_runtime::iterators::IntoReturned; })
+        result_uses.push(syn::parse_quote! { use ::riko_runtime::iterator::IntoReturned; })
     }
 
     // Parameters of the generated function
@@ -204,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn fun_iterators() {
+    fn fun_iterator() {
         let function: syn::ItemFn = syn::parse_quote! {
             fn function(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
                 unimplemented!()
@@ -225,7 +225,7 @@ mod tests {
                 arg_0_jni: ::jni::sys::jbyteArray,
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
-                use ::riko_runtime::iterators::IntoReturned;
+                use ::riko_runtime::iterator::IntoReturned;
 
                 let result: ::riko_runtime::returned::Returned<_> = function(
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni),

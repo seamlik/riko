@@ -1,5 +1,4 @@
 enabled = true
-module = "org::examples"
 
 [jni]
 enabled = true

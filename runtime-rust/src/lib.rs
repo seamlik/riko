@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub mod heap;
-pub mod iterators;
+pub mod iterator;
 pub mod returned;
 
 /// Object marshaled between the FFI boundry.
