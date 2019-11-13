@@ -15,13 +15,13 @@ pub fn heaped(name: &Ident) -> TokenStream {
     let result = quote! {
         impl ::riko_runtime::heap::Heaped for #name {
             fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                ::riko_runtime::heap::store(&#pool_name, self).into()
+                ::riko_runtime::heap::Pool::store(&*#pool_name, self).into()
             }
         }
 
         ::lazy_static::lazy_static! {
             #[allow(non_upper_case_globals)]
-            static ref #pool_name: ::riko_runtime::heap::Pool<#name> = ::std::default::Default::default();
+            static ref #pool_name: ::riko_runtime::heap::SimplePool<#name> = ::std::default::Default::default();
         }
     };
     result
@@ -251,13 +251,13 @@ mod tests {
         let expected = quote ! {
             impl ::riko_runtime::heap::Heaped for NuclearReactor {
                 fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                    ::riko_runtime::heap::store(&__RIKO_POOL_NuclearReactor, self).into()
+                    ::riko_runtime::heap::Pool::store(&*__RIKO_POOL_NuclearReactor, self).into()
                 }
             }
 
             ::lazy_static::lazy_static! {
                 #[allow(non_upper_case_globals)]
-                static ref __RIKO_POOL_NuclearReactor: ::riko_runtime::heap::Pool<NuclearReactor> = ::std::default::Default::default();
+                static ref __RIKO_POOL_NuclearReactor: ::riko_runtime::heap::SimplePool<NuclearReactor> = ::std::default::Default::default();
             }
         }.to_string();
 

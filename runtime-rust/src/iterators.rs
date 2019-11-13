@@ -3,6 +3,7 @@
 use crate::heap::Handle;
 use crate::heap::Heaped;
 use crate::heap::Pool;
+use crate::heap::SimplePool;
 use crate::returned::Returned;
 use jni::objects::JClass;
 use jni::sys::jbyteArray;
@@ -11,7 +12,7 @@ use serde::Serialize;
 use std::error::Error;
 
 lazy_static::lazy_static! {
-    static ref POOL: Pool<ReturningIterator> = Default::default();
+    static ref POOL: SimplePool<ReturningIterator> = Default::default();
 }
 
 /// [Iterator] to be used by the target code.
@@ -47,7 +48,7 @@ impl Heaped for ReturningIterator {
     fn into_handle(self) -> Returned<Handle> {
         Returned {
             error: None,
-            value: Some(crate::heap::store(&POOL, self)),
+            value: Some(POOL.store(self)),
         }
     }
 }
@@ -66,7 +67,7 @@ pub extern "C" fn Java_riko_ReturningIterator__1_1next(
             .new_byte_array(0)
             .expect("Failed to allocate an empty byte array from JNI."),
     };
-    crate::heap::peek(&POOL, handle, action)
+    POOL.peek(handle, action)
 }
 
 #[no_mangle]
@@ -75,7 +76,7 @@ pub extern "C" fn Java_riko_ReturningIterator__1_1drop(
     _class: JClass,
     handle: Handle,
 ) {
-    crate::heap::drop::<ReturningIterator>(&POOL, handle);
+    POOL.drop(handle);
 }
 
 /// Marshals a raw [Iterator] into a [Handle] of a [ReturningIterator].
@@ -116,7 +117,7 @@ where
     T: Serialize,
 {
     fn __riko_into_returned(self) -> Returned<Handle> {
-        self.map(|iter| crate::heap::store(&POOL, ReturningIterator::new(iter)))
+        self.map(|iter| POOL.store(ReturningIterator::new(iter)))
             .into()
     }
 }
