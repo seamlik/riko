@@ -1,4 +1,19 @@
 //! Sub-optimal language binding generator.
+//!
+//! # Config
+//!
+//! In order to enable code generation, a config file called `Riko.toml` must be present at the same
+//! directory where `Cargo.toml` resides.
+//!
+//! ## Root Section
+//!
+//! * `enabled`: Enable code generation. Defaults to `false`.
+//! * `output`: Directory to place the generated target code. Relative to the config file. Defaults
+//!   to `target/riko`.
+//!
+//! ## `[jni]` Section
+//!
+//! * `enabled`: Enable JNI bindings generation. Defaults to false.
 
 #![feature(proc_macro_span)]
 
