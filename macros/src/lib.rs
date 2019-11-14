@@ -14,8 +14,6 @@ use proc_macro::TokenStream;
 use syn::ItemFn;
 use syn::ItemStruct;
 
-const ERROR_CONFIG: &str = "Failed to read the config.";
-
 /// Generates language bindings for a function.
 ///
 /// This attribute only applies on a
@@ -117,7 +115,7 @@ const ERROR_CONFIG: &str = "Failed to read the config.";
 /// For returned types, only owned types are supported.
 #[proc_macro_attribute]
 pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let config = config::current().expect(ERROR_CONFIG);
+    let config = config::current();
     if !config.enabled {
         return item;
     }
@@ -144,7 +142,7 @@ pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// trait.
 #[proc_macro_derive(Heaped)]
 pub fn derive_heap(item: TokenStream) -> TokenStream {
-    let config = config::current().expect(ERROR_CONFIG);
+    let config = config::current();
     if !config.enabled {
         return TokenStream::new();
     }

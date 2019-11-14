@@ -2,59 +2,64 @@ use once_cell::sync::Lazy;
 use proc_macro2::Span;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+/// All configs indexed by the canonical path to `Riko.toml`.
+///
+/// The default config is indexed by an empty path. It is for source files of external crates.
 static CONFIGS: Lazy<Mutex<HashMap<PathBuf, Arc<Config>>>> =
     Lazy::new(|| Mutex::new(std::iter::once(Default::default()).collect()));
 
 const CONFIG_FILENAME: &str = "Riko.toml";
 
 /// Gets the config according the call site.
-pub fn current() -> Result<Arc<Config>, Box<dyn Error>> {
-    let config_path = locate(proc_macro::Span::call_site())?;
-    let mut configs = CONFIGS.lock()?;
+pub fn current() -> Arc<Config> {
+    let config_path = locate(proc_macro::Span::call_site());
+    let mut configs = CONFIGS.lock().expect("Failed to lock the configs");
     if let Some(config) = configs.get(&config_path) {
-        Ok(config.clone())
+        config.clone()
     } else {
-        let config = Arc::new(read(&config_path)?);
+        let config = Arc::new(read(&config_path));
         configs.insert(config_path, config.clone());
-        Ok(config)
+        config
     }
 }
 
 /// Reads config from filesystem.
-fn read(config_path: &Path) -> Result<Config, Box<dyn Error>> {
-    let mut config: Config = toml::from_slice(&std::fs::read(config_path)?)?;
-    config.expand_all_fields(&config_path)?;
-    Ok(config)
+fn read(config_path: &Path) -> Config {
+    let mut config: Config = toml::from_slice(&std::fs::read(config_path).expect(&format!(
+        "Invalid path to `{}`: {}",
+        CONFIG_FILENAME,
+        config_path.to_str().unwrap_or("corrupted")
+    )))
+    .unwrap();
+    config.expand_all_fields(&config_path);
+    config
 }
 
-/// Locates a config upwards from the source file being expanded.
+/// Locates `Riko.toml` bottom-up from the source file being expanded.
 ///
 /// First look for `Riko.toml` in the directory containing the source file, then continue searching
 /// its parent directory until the root is reached.
-fn locate(span: proc_macro::Span) -> std::io::Result<PathBuf> {
+fn locate(span: proc_macro::Span) -> PathBuf {
     let source_file = root_span(span).source_file();
     let mut config_path = if source_file.is_real() {
-        source_file.path().canonicalize()?
+        source_file.path().parent().unwrap().canonicalize().unwrap()
     } else {
         eprintln!("Source file in an external crate, skipping code geeration.");
-        return Ok(Default::default());
+        return Default::default();
     };
-    if !config_path.is_dir() {
-        config_path.pop();
-    }
     loop {
         config_path.push(CONFIG_FILENAME);
         if config_path.is_file() {
-            break Ok(config_path);
+            break config_path;
         } else if config_path.parent().unwrap().parent().is_none() {
+            // Search reached root
             eprintln!("No Riko configuration found, skipping code generation.");
-            break Ok(Default::default()); // Reached root
+            break Default::default();
         } else {
             config_path.pop();
             config_path.pop();
@@ -71,7 +76,7 @@ fn root_span(span: proc_macro::Span) -> proc_macro::Span {
 }
 
 /// `Riko.toml`.
-#[derive(Deserialize, Default)]
+#[derive(Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub enabled: bool,
@@ -87,11 +92,20 @@ pub struct Config {
 }
 
 impl Config {
-    /// Fills in all cached data by reading additional information from elsewhere.
-    fn expand_all_fields(&mut self, config_path: &Path) -> Result<(), Box<dyn Error>> {
+    /// Fills in all optional fields, expands all relative filesystem paths, etc..
+    fn expand_all_fields(&mut self, config_path: &Path) {
         let cargo_path = config_path.with_file_name("Cargo.toml");
-        let cargo: CargoConfig = toml::from_slice(&std::fs::read(&cargo_path)?)?;
+        let cargo: CargoConfig = toml::from_slice(&std::fs::read(&cargo_path).expect(&format!(
+            "Invalid path to `Cargo.toml`: {}",
+            cargo_path.to_str().unwrap_or("corrupted")
+        )))
+        .expect(&format!("`{}` contains invalid TOML", CONFIG_FILENAME));
+
         self.crate_name = cargo.package.name;
+        if self.output.is_relative() {
+            self.output = config_path.parent().unwrap().join(&self.output)
+        };
+
         self.entry = if cargo.lib.path.is_absolute() {
             cargo.lib.path
         } else {
@@ -100,14 +114,12 @@ impl Config {
             entry.extend(cargo.lib.path.iter());
             entry
         };
-
-        Ok(())
     }
 
     /// Gets the module path of a [Span] according to its source file path.
     ///
     /// The result will not be correct if the actual module is a sub-module inside a source file.
-    pub fn module_by_span(&self, span: Span) -> syn::Result<Vec<String>> {
+    pub fn guess_module_by_span(&self, span: Span) -> syn::Result<Vec<String>> {
         let source_file = root_span(span.unwrap()).source_file();
         if self.crate_name.is_empty() {
             Err(syn::Error::new(span, "Unknown crate name."))
@@ -147,7 +159,20 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            crate_name: Default::default(),
+            enabled: false,
+            entry: Default::default(),
+            jni: Default::default(),
+            output: ["target", "riko"].iter().collect(),
+        }
+    }
+}
+
 #[derive(Deserialize, Default)]
+#[serde(default)]
 pub struct JniConfig {
     pub enabled: bool,
 }
@@ -173,7 +198,7 @@ struct CargoConfigLib {
 impl Default for CargoConfigLib {
     fn default() -> Self {
         Self {
-            path: vec!["src", "lib.rs"].into_iter().collect(),
+            path: ["src", "lib.rs"].iter().collect(),
         }
     }
 }
