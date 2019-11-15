@@ -2,6 +2,7 @@ mod expand;
 
 use crate::config::Config;
 use crate::parse::Fun;
+use crate::parse::MarshalingRule;
 use proc_macro::TokenStream;
 use syn::ItemFn;
 use syn::ItemStruct;
@@ -11,8 +12,14 @@ pub struct Bindgen<'cfg> {
 }
 
 impl<'cfg> crate::Bindgen<'cfg> for Bindgen<'cfg> {
-    fn fun(&self, item: &ItemFn, args: &Fun) -> TokenStream {
-        expand::fun(&item.sig, args).into()
+    fn fun(&self, item: &mut ItemFn, args: &Fun) -> TokenStream {
+        match MarshalingRule::parse(item.sig.inputs.iter_mut()) {
+            Ok(input_rules) => {
+                // TODO: codegen
+                expand::fun(&item.sig, args).into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        }
     }
 
     fn new(config: &'cfg Config) -> Self {

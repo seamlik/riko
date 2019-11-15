@@ -12,8 +12,6 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::error::Error;
 
-static POOL: Lazy<SimplePool<ReturningIterator>> = Lazy::new(|| Default::default());
-
 /// [Iterator] to be used by the target code.
 ///
 /// This [Iterator] is allocated on the heap and serializes the emitted items of the original
@@ -51,6 +49,8 @@ impl Heaped for ReturningIterator {
         }
     }
 }
+
+static POOL: Lazy<SimplePool<ReturningIterator>> = Lazy::new(Default::default);
 
 #[no_mangle]
 pub extern "C" fn Java_riko_ReturningIterator__1_1next(

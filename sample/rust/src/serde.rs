@@ -16,8 +16,18 @@ struct Life {
     pub happy: bool,
 }
 
-#[riko::fun(sig = "(Serde<Love>, Serde<Work>) -> Serde<Life>")]
-fn _serde(love: Love, work: &Work) -> Life {
+#[riko::fun]
+fn serde_inferred(love: crate::serde::Love, work: crate::serde::Work) -> crate::serde::Life {
+    crate::serde::Life {
+        happy: !love.target.is_empty() && work.salary > 0,
+    }
+}
+
+#[riko::fun(marshal = "Serde<crate::serde::Life>")]
+fn serde_explicit(
+    #[riko::marshal(Serde<crate::serde::Love>)] love: Love,
+    #[riko::marshal(Serde<crate::serde::Work>)] work: Work,
+) -> crate::serde::Life {
     Life {
         happy: !love.target.is_empty() && work.salary > 0,
     }

@@ -18,8 +18,11 @@ fn rename_ffi() {
     println!("A function to be renamed.");
 }
 
-#[riko::fun(sig = "(I32, I32) -> I32")]
-fn result_option(a: Option<i32>, b: Option<i32>) -> Result<Option<i32>, std::fmt::Error> {
+#[riko::fun(marshal = "I32")]
+fn result_option(
+    #[riko::marshal(I32)] a: Option<i32>,
+    #[riko::marshal(I32)] b: Option<i32>,
+) -> Result<Option<i32>, std::fmt::Error> {
     match (a, b) {
         (Some(a_value), Some(b_value)) => Ok(Some(a_value + b_value)),
         (None, None) => Err(std::fmt::Error),
@@ -28,17 +31,26 @@ fn result_option(a: Option<i32>, b: Option<i32>) -> Result<Option<i32>, std::fmt
 }
 
 #[riko::fun]
-fn reference(a: &String, b: &String) -> String {
-    let result = a.clone();
-    result + b
+fn string(a: String, b: String) -> String {
+    a + &b
 }
 
-#[riko::fun(sig = "(_, _) -> Iterator<String>")]
+#[riko::fun]
+fn bytes(mut x: Vec<u8>, y: Vec<u8>) -> Vec<u8> {
+    x.extend(y);
+    x
+}
+
+fn _bool(x: bool, y: bool) -> bool {
+    x && y
+}
+
+#[riko::fun(marshal = "Iterator<String>")]
 fn iterator(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
     Box::new(vec![a, b].into_iter())
 }
 
-#[riko::fun(sig = "(_, _) -> Iterator<String>")]
+#[riko::fun(marshal = "Iterator<String>")]
 fn iterator_fallible(
     item: String,
     fails: bool,

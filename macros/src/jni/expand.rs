@@ -1,4 +1,5 @@
 use crate::parse::Fun;
+use crate::parse::MarshalingRule;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -21,7 +22,7 @@ pub fn heaped(name: &Ident) -> TokenStream {
 
         #[allow(non_upper_case_globals)]
         static #pool_name: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<#name>> = ::once_cell::sync::Lazy::new(
-            || ::std::default::Default::default()
+            ::std::default::Default::default
         );
     };
     result
@@ -29,20 +30,15 @@ pub fn heaped(name: &Ident) -> TokenStream {
 
 /// Generates Rust code wrapping a function.
 ///
-/// # Parameters
-///
-/// * `args`: Must be a complete version with all optional fields filled in.
+/// * `args` must be expanded in advance.
 pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
-    // Global defs
-    let has_iterators = args.sig.has_iterators();
-
     // Name of the generated function
     let original_name = &sig.ident;
     let result_name = mangle_function(&args.name, args.module.iter());
 
     // `use` statements
     let mut result_uses = Vec::<ItemUse>::new();
-    if has_iterators {
+    if let Some(MarshalingRule::Iterator(_)) = &args.marshal {
         result_uses.push(syn::parse_quote! { use ::riko_runtime::iterator::IntoReturned; })
     }
 
@@ -54,12 +50,12 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     // Function arguments placed at the invocation of the original function
     let mut result_args_invoked = Vec::<TokenStream>::new();
 
-    for index in 0..(args.sig.inputs.len()) {
+    for index in 0..sig.inputs.len() {
         // Parameters
         let param_name = quote::format_ident!("arg_{}_jni", index);
         result_params.push(quote! { #param_name : ::jni::sys::jbyteArray });
 
-        // Using the arguments
+        // Marshal JNI data as Rust data
         let arg_original = &sig.inputs[index];
         let arg_invoked = if let FnArg::Typed(pattern) = arg_original {
             let candidate = quote! {
@@ -78,12 +74,12 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     }
 
     // Block that calls the original function
-    let result_invocation_conversion = if has_iterators {
+    let result_invocation_conversion = if let Some(MarshalingRule::Iterator(_)) = &args.marshal {
         quote! { .__riko_into_returned() }
     } else {
         quote! { .into() }
     };
-    let result_block_invocation = match &args.sig.output {
+    let result_block_invocation = match &args.marshal {
         Some(output) => {
             let output_type = output.to_rust_return_type();
             quote! {
@@ -116,8 +112,8 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
 }
 
 /// Transform a function's original name to the one used by JNI.
-fn mangle_function<'a>(name: &str, module: impl Iterator<Item = &'a String>) -> Ident {
-    let mut module_mangled = module.map(|it| it.replace("_", "_1")).join("_");
+fn mangle_function<S: AsRef<str>>(name: &str, module: impl Iterator<Item = S>) -> Ident {
+    let mut module_mangled = module.map(|it| it.as_ref().replace("_", "_1")).join("_");
     if !module_mangled.is_empty() {
         module_mangled.push_str("_");
     }
@@ -136,11 +132,11 @@ mod tests {
     fn mangle_function() {
         assert_eq!(
             "Java_org_example__1_1Riko_1Module__1_1riko_1run",
-            super::mangle_function("run", vec!["org".into(), "example".into()].iter()).to_string()
+            super::mangle_function("run", ["org", "example"].iter()).to_string()
         );
         assert_eq!(
             "Java__1_1Riko_1Module__1_1riko_1run",
-            super::mangle_function("run", std::iter::empty()).to_string()
+            super::mangle_function("run", std::iter::empty::<String>()).to_string()
         );
     }
 
@@ -172,14 +168,17 @@ mod tests {
     #[test]
     fn fun_simple() {
         let function: syn::ItemFn = syn::parse_quote! {
-            fn function(a: &String, b: Option<String>) -> Result<Option<String>> {
+            fn function(
+                a: &String,
+                #[riko::marshal(String)] b: Option<String>
+            ) -> Result<Option<String>> {
                 unimplemented!()
             }
         };
         let args: Fun = syn::parse_quote! {
             module = "samples",
             name = "function",
-            sig = "(String, String) -> String",
+            marshal = "String",
         };
 
         let actual = fun(&function.sig, &args).to_string();
@@ -206,14 +205,17 @@ mod tests {
     #[test]
     fn fun_iterator() {
         let function: syn::ItemFn = syn::parse_quote! {
-            fn function(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
+            fn function(
+                #[riko::marshal(String)] a: String,
+                #[riko::marshal(String)] b: String
+            ) -> Box<dyn Iterator<Item = String> + Send + 'static> {
                 unimplemented!()
             }
         };
         let args: Fun = syn::parse_quote! {
             module = "samples",
             name = "function",
-            sig = "(String, String) -> Iterator<String>",
+            marshal = "Iterator<String>",
         };
 
         let actual = fun(&function.sig, &args).to_string();
@@ -257,7 +259,7 @@ mod tests {
 
             #[allow(non_upper_case_globals)]
             static __RIKO_POOL_NuclearReactor: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<NuclearReactor>> = ::once_cell::sync::Lazy::new(
-                || ::std::default::Default::default()
+                ::std::default::Default::default
             );
         }.to_string();
 
