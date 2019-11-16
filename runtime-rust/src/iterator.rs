@@ -85,7 +85,7 @@ pub extern "C" fn Java_riko_ReturningIterator__1_1drop(
 /// used.
 pub trait IntoReturned<T: Serialize> {
     /// Performs the marshaling.
-    fn __riko_into_returned(self) -> Returned<Handle>;
+    fn into(self) -> Returned<Handle>;
 }
 
 /// Implements on a trait object instead of a concrete [Iterator].
@@ -97,7 +97,7 @@ where
     T: Serialize,
     R: Into<Returned<T>> + 'static,
 {
-    fn __riko_into_returned(self) -> Returned<Handle> {
+    fn into(self) -> Returned<Handle> {
         ReturningIterator::new(self).into_handle()
     }
 }
@@ -115,7 +115,7 @@ where
     R: Into<Returned<T>> + 'static,
     T: Serialize,
 {
-    fn __riko_into_returned(self) -> Returned<Handle> {
+    fn into(self) -> Returned<Handle> {
         self.map(|iter| POOL.store(ReturningIterator::new(iter)))
             .into()
     }

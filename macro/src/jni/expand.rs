@@ -5,7 +5,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::FnArg;
 use syn::Ident;
-use syn::ItemUse;
 use syn::ReturnType;
 use syn::Signature;
 use syn::Type;
@@ -35,12 +34,6 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     // Name of the generated function
     let original_name = &sig.ident;
     let result_name = mangle_function(&args.name, args.module.iter());
-
-    // `use` statements
-    let mut result_uses = Vec::<ItemUse>::new();
-    if let Some(MarshalingRule::Iterator(_)) = &args.marshal {
-        result_uses.push(syn::parse_quote! { use ::riko_runtime::iterator::IntoReturned; })
-    }
 
     // Parameters of the generated function
     let mut result_params = Vec::<TokenStream>::new();
@@ -74,21 +67,24 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     }
 
     // Block that calls the original function
-    let result_invocation_conversion = if let Some(MarshalingRule::Iterator(_)) = &args.marshal {
-        quote! { .__riko_into_returned() }
-    } else {
-        quote! { .into() }
-    };
     let result_block_invocation = match &args.marshal {
         Some(output) => {
             let output_type = output.to_rust_return_type();
+            let into_returned = if let Some(MarshalingRule::Iterator(_)) = &args.marshal {
+                quote! {
+                    let returned = ::riko_runtime::iterator::IntoReturned::into(result);
+                }
+            } else {
+                quote! {
+                    let returned: ::riko_runtime::returned::Returned<#output_type> = std::convert::Into::into(result);
+                }
+            };
             quote! {
-                let result: ::riko_runtime::returned::Returned< #output_type > = #original_name(
+                let result = #original_name(
                     #(#result_args_invoked),*
-                )
-                #result_invocation_conversion ;
-
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                );
+                #into_returned
+                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
             }
         }
         None => quote! { #original_name(#(#result_args_invoked),*) },
@@ -104,7 +100,6 @@ pub fn fun(sig: &Signature, args: &Fun) -> TokenStream {
     let result = quote! {
         #[no_mangle]
         pub extern "C" fn #result_name(#(#result_params),*) #result_output {
-            #(#result_uses)*
             #result_block_invocation
         }
     };
@@ -190,11 +185,12 @@ mod tests {
                 arg_0_jni: ::jni::sys::jbyteArray,
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
-                let result: ::riko_runtime::returned::Returned<::std::string::String> = function(
+                let result = function(
                     &(::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni)),
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
-                ).into();
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                );
+                let returned: ::riko_runtime::returned::Returned<::std::string::String> = std::convert::Into::into(result);
+                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
             }
         }
         .to_string();
@@ -227,15 +223,12 @@ mod tests {
                 arg_0_jni: ::jni::sys::jbyteArray,
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
-                use ::riko_runtime::iterator::IntoReturned;
-
-                let result: ::riko_runtime::returned::Returned<_> = function(
+                let result = function(
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni),
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
-                )
-                .__riko_into_returned();
-
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                );
+                let returned = ::riko_runtime::iterator::IntoReturned::into(result);
+                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
             }
         }
         .to_string();
