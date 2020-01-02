@@ -5,10 +5,10 @@
     <groupId>riko</groupId>
     <artifactId>riko-parent</artifactId>
     <version>0.0.1</version>
-    <relativePath>../../pom.xml</relativePath>
+    <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>riko-sample-jni</artifactId>
+  <artifactId>riko-sample</artifactId>
 
   <dependencies>
     <dependency>

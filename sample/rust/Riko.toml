@@ -1,5 +1,0 @@
-enabled = true
-output = "../jni/src/main/java"
-
-[jni]
-enabled = true

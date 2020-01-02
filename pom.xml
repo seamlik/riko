@@ -13,6 +13,6 @@
 
   <modules>
     <module>runtime-java</module>
-    <module>sample/jni</module>
+    <module>sample-jni</module>
   </modules>
 </project>

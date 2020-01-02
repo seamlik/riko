@@ -1,0 +1,5 @@
+enabled = true
+output = "../sample-jni/src/main/java"
+
+[jni]
+enabled = true
