@@ -1,5 +1,6 @@
 mod heap;
-mod serde;
+//mod iterator;
+//mod serde;
 
 use std::result::Result;
 
@@ -43,21 +44,4 @@ fn bytes(mut x: Vec<u8>, y: Vec<u8>) -> Vec<u8> {
 
 fn _bool(x: bool, y: bool) -> bool {
     x && y
-}
-
-#[riko::fun(marshal = "Iterator<String>")]
-fn iterator(a: String, b: String) -> Box<dyn Iterator<Item = String> + Send + 'static> {
-    Box::new(vec![a, b].into_iter())
-}
-
-#[riko::fun(marshal = "Iterator<String>")]
-fn iterator_fallible(
-    item: String,
-    fails: bool,
-) -> Result<impl Iterator<Item = String> + Send + 'static, std::fmt::Error> {
-    if fails {
-        Err(std::fmt::Error)
-    } else {
-        Ok(std::iter::once(item))
-    }
 }

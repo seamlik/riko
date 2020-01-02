@@ -11,7 +11,7 @@ use syn::Type;
 
 /// Generates Rust code wrapping a `Heaped`.
 pub fn heaped(name: &Ident) -> TokenStream {
-    let pool_name = quote::format_ident!("__RIKO_POOL_{}", name);
+    let pool_name = quote::format_ident!("__riko_POOL_{}", name);
     let result = quote! {
         impl ::riko_runtime::heap::Heaped for #name {
             fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
@@ -246,12 +246,12 @@ mod tests {
         let expected = quote ! {
             impl ::riko_runtime::heap::Heaped for NuclearReactor {
                 fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                    ::riko_runtime::heap::Pool::store(&*__RIKO_POOL_NuclearReactor, self).into()
+                    ::riko_runtime::heap::Pool::store(&*__riko_POOL_NuclearReactor, self).into()
                 }
             }
 
             #[allow(non_upper_case_globals)]
-            static __RIKO_POOL_NuclearReactor: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<NuclearReactor>> = ::once_cell::sync::Lazy::new(
+            static __riko_POOL_NuclearReactor: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<NuclearReactor>> = ::once_cell::sync::Lazy::new(
                 ::std::default::Default::default
             );
         }.to_string();

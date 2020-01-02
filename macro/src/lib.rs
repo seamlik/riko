@@ -2,8 +2,10 @@
 //!
 //! # Config
 //!
-//! In order to enable code generation, a config file called `Riko.toml` must be present at the same
-//! directory where `Cargo.toml` resides.
+//! In order to enable code generation, a config file called `Riko.toml` must be present alongside
+//! `Cargo.toml`. This is to prevent Riko attributes in external crates from generating target code.
+//! Furthermore, environment variable `RIKO_ENABLED` must set to `true` in order to reduce I/O
+//! during IDE analysis.
 //!
 //! ## Root Section
 //!
@@ -20,6 +22,7 @@
 
 extern crate proc_macro;
 
+mod codegen;
 mod config;
 mod jni;
 mod parse;
@@ -33,7 +36,7 @@ use syn::ItemStruct;
 
 /// Specifies marshaling rule for a function parameter.
 ///
-/// To specify a rule for the return type, the `marshal` parameter of [fun].
+/// To specify a rule for the return type, use the `marshal` parameter of [fun].
 ///
 /// This is a helper attribute for [fun]. In order to avoid name collision, the fully-qualified
 /// attribute name (`#[riko::marshal]`) must be used.
@@ -99,7 +102,7 @@ use syn::ItemStruct;
 /// inside an [Option]. In the return position, wrapping the type in a [Result]
 /// is also supported.
 ///
-/// ## References and borrowed Types
+/// # References and borrowed Types
 ///
 /// For function parameters, references are also supported. Unfortunately, the borrowed version of
 /// a specific type is not supported (e.g. `&str` instead of `&String`), as that will prevent us

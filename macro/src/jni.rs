@@ -1,3 +1,4 @@
+mod codegen;
 mod expand;
 
 use crate::config::Config;
@@ -15,7 +16,9 @@ impl<'cfg> crate::Bindgen<'cfg> for Bindgen<'cfg> {
     fn fun(&self, item: &mut ItemFn, args: &Fun) -> TokenStream {
         match MarshalingRule::parse(item.sig.inputs.iter_mut()) {
             Ok(input_rules) => {
-                // TODO: codegen
+                if crate::config::env_riko_enabled() {
+                    codegen::fun(args, &input_rules);
+                }
                 expand::fun(&item.sig, args).into()
             }
             Err(err) => err.to_compile_error().into(),

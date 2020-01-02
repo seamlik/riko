@@ -7,6 +7,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+/// Checks if target code generation is enabled in the environment variables.
+pub fn env_riko_enabled() -> bool {
+    match std::env::var("RIKO_ENABLED") {
+        Ok(enabled) if enabled == "true" => true,
+        _ => false,
+    }
+}
+
 /// All configs indexed by the canonical path to `Riko.toml`.
 ///
 /// The default config is indexed by an empty path. It is for source files of external crates.

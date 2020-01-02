@@ -4,6 +4,7 @@
 .idea/
 .project
 .settings
+/sample/jni/src/main/java/
 Cargo.lock
 build/
 out/

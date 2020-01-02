@@ -12,10 +12,14 @@ public class Returned<T> {
   @Nullable
   public T value;
 
+  /**
+   * Unwraps the returned value.
+   * @throws ReturnedException If the Rust side returned an error.
+   */
   @Nullable
-  public T unwrap() throws UserException {
+  public T unwrap() throws ReturnedException {
     if (error != null) {
-      throw new UserException(error);
+      throw new ReturnedException(error);
     } else {
       return value;
     }
