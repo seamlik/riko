@@ -10,12 +10,10 @@ version = "0.0.1"
 proc-macro = true
 
 [dependencies]
-derive_more = "0"
+anyhow = "1"
+cargo_metadata = "0"
 itertools = "0"
-once_cell = "1"
-proc-macro2 = "1.0.3"
-quote = "1.0.2"
-regex = { version = "1", features = ["pattern"] }
-serde = { version = "1.0.98", features = ["derive"] }
-syn = { version = "1.0.5", features = ["full"] }
-toml = "0.5.1"
+proc-macro2 = { version = "1", features = ["span-locations"]}
+quote = "1"
+riko_core = { path = "../core" }
+syn = { version = "1", features = ["full"] }
