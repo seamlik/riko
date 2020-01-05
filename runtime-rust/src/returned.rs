@@ -2,7 +2,6 @@
 
 use serde::Deserialize;
 use serde::Serialize;
-use std::result::Result;
 
 #[derive(Serialize, Deserialize)]
 pub struct Returned<T> {

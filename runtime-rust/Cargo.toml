@@ -6,8 +6,6 @@ edition = "2018"
 name = "riko_runtime"
 version = "0.0.1"
 
-[lib]
-
 [dependencies]
 jni = "0"
 once_cell = "1"
