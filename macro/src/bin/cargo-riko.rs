@@ -1,10 +1,7 @@
-use anyhow::Context;
-use cargo_metadata::MetadataCommand;
 use riko_core::config::Config;
 use riko_core::ir::Crate;
 use riko_core::jni::JniWriter;
 use riko_core::TargetCodeWriter;
-use std::collections::HashSet;
 
 pub fn main() {
     if std::env::args().len() > 1 {
@@ -16,35 +13,15 @@ pub fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
-    let configs = read_all_configs().unwrap();
+    let configs = Config::read_all_configs()?;
     for config in configs.iter() {
         if config.jni.enabled {
-            let ir = Crate::parse(&config.entry, config.crate_name.clone())?;
+            let ir = Crate::parse(&config.cached.entry, config.cached.crate_name.clone())?;
             let writer = JniWriter::new(config);
             writer.write_all(&ir)?;
         }
     }
     Ok(())
-}
-
-/// Reads the top-level `Cargo.toml` and reads the `Riko.toml` of all crates in the workspace.
-fn read_all_configs() -> anyhow::Result<Vec<Config>> {
-    let metadata = MetadataCommand::new().exec()?;
-    let workspace_members_ids = metadata.workspace_members.iter().collect::<HashSet<_>>();
-    let mut configs = Vec::new();
-    for pkg in metadata
-        .packages
-        .into_iter()
-        .filter(|x| workspace_members_ids.contains(&x.id))
-    {
-        let config_path = pkg
-            .manifest_path
-            .with_file_name(riko_core::config::FILENAME);
-        let config = Config::read(&config_path)
-            .with_context(|| format!("Failed to read config {}", config_path.display()))?;
-        configs.push(config);
-    }
-    Ok(configs)
 }
 
 fn handle_error(err_root: anyhow::Error) -> ! {

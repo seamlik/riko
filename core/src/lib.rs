@@ -38,7 +38,7 @@ pub trait TargetCodeWriter<'cfg> {
     fn target_name() -> &'static str;
 
     fn write_target_file(&self, path: &Path, content: &str) -> std::io::Result<()> {
-        let mut path_full = self.config().output.to_owned();
+        let mut path_full = self.config().cached.output_directory.to_owned();
         path_full.push(Self::target_name());
         path_full.push(path);
 

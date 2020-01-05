@@ -3,12 +3,9 @@
 //! # Config
 //!
 //! In order to enable code generation, a config file called `Riko.toml` must be present alongside
-//! `Cargo.toml`.
+//! `Cargo.toml`. See [`Config`](riko_core::config::Config) for its fields.
 //!
 //! ## Root Section
-//!
-//! * `output`: Directory to place the generated target code. Relative to the config file. Defaults
-//!   to `target/riko`.
 //!
 //! ## `[jni]` Section
 //!

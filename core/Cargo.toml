@@ -10,6 +10,7 @@ version = "0.0.1"
 [dependencies]
 anyhow = "1"
 blake2 = "0"
+cargo_metadata = "0"
 data-encoding = "2"
 itertools = "0"
 proc-macro2 = "1"
