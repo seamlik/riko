@@ -4,6 +4,7 @@ categories = ["development-tools::ffi"]
 description = "Sub-optimal language binding generator"
 edition = "2018"
 name = "riko"
+repository = "https://github.com/seamlik/riko"
 version = "0.0.1"
 
 [lib]
