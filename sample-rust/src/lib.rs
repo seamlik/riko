@@ -1,8 +1,6 @@
-mod heap;
+mod heaped;
 //mod iterator;
 //mod serde;
-
-use std::result::Result;
 
 #[riko::fun]
 fn nothing() {
@@ -42,6 +40,11 @@ fn bytes(mut x: Vec<u8>, y: Vec<u8>) -> Vec<u8> {
     x
 }
 
+#[riko::fun]
 fn _bool(x: bool, y: bool) -> bool {
     x && y
+}
+
+pub fn ignored() {
+    panic!("This function is not exported")
 }
