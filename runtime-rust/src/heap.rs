@@ -49,11 +49,11 @@ pub type SimplePool<T> = RwLock<HashMap<Handle, Arc<Mutex<T>>>>;
 
 impl<T> Pool<T> for SimplePool<T> {
     fn peek<R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
-        let pool_guard = self.read().expect("Failed to read-lock the pool.");
+        let pool_guard = self.read().expect("Failed to read-lock the pool");
         let obj_arc = pool_guard[&handle].clone();
         std::mem::drop(pool_guard);
 
-        let mut obj = obj_arc.lock().expect("Failed to lock the object.");
+        let mut obj = obj_arc.lock().expect("Failed to lock the object");
         action(&mut *obj)
     }
 

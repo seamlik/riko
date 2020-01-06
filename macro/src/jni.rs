@@ -48,7 +48,7 @@ impl MacroExpander for JniExpander {
                     candidate
                 }
             } else {
-                syn::Error::new_spanned(arg_original, "Does not support this kind of parameter.")
+                syn::Error::new_spanned(arg_original, "Does not support this kind of parameter")
                     .to_compile_error()
             };
             result_args_invoked.push(arg_invoked);

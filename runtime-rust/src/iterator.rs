@@ -28,7 +28,7 @@ impl ReturningIterator {
         let inner = src.map(|item| {
             let returned: Returned<T> = item.into();
             serde_cbor::to_vec(&returned)
-                .expect("Failed to serialize the data returned by an iterator.")
+                .expect("Failed to serialize the data returned by an iterator")
         });
         Self(Box::new(inner))
     }
@@ -61,10 +61,10 @@ pub extern "C" fn Java_riko_ReturningIterator__1_1next(
     let action = |iterator: &mut ReturningIterator| match iterator.next() {
         Some(data) => env
             .byte_array_from_slice(&data)
-            .expect("Failed to send the data from an iterator to JNI."),
+            .expect("Failed to send the data from an iterator to JNI"),
         None => env
             .new_byte_array(0)
-            .expect("Failed to allocate an empty byte array from JNI."),
+            .expect("Failed to allocate an empty byte array from JNI"),
     };
     POOL.peek(handle, action)
 }

@@ -18,16 +18,16 @@ pub mod returned;
 /// into [CBOR](https://cbor.io) byte array and sent between the FFI boundary.
 pub trait Marshaled: Serialize + DeserializeOwned {
     fn to_jni(&self, env: &JNIEnv) -> jbyteArray {
-        let output = serde_cbor::to_vec(self).expect("Failed to marshal the object.");
+        let output = serde_cbor::to_vec(self).expect("Failed to marshal the object");
         env.byte_array_from_slice(&output)
-            .expect("Failed to send the marshaled data to JNI.")
+            .expect("Failed to send the marshaled data to JNI")
     }
 
     fn from_jni(env: &JNIEnv, src: jbyteArray) -> Self {
         let input = env
             .convert_byte_array(src)
-            .expect("Failed to receive a byte array from JNI.");
-        serde_cbor::from_slice(&input).expect("Type mismatch for this CBOR data.")
+            .expect("Failed to receive a byte array from JNI");
+        serde_cbor::from_slice(&input).expect("Type mismatch for this CBOR data")
     }
 }
 

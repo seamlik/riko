@@ -30,7 +30,7 @@ use syn::ItemStruct;
 /// attribute name (`#[riko::marshal]`) must be used.
 #[proc_macro_attribute]
 pub fn marshal(_: TokenStream, _: TokenStream) -> TokenStream {
-    unimplemented!("Must not be used on its own.")
+    unimplemented!("Must not be used on its own")
 }
 
 /// Generates language bindings for a function.

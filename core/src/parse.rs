@@ -81,9 +81,9 @@ impl TryFrom<AttributeArgs> for Fun {
                     Some(name) if name == "marshal" => {
                         result.marshal = Some(assert_lit_is_litstr(&pair.lit)?.parse()?);
                     }
-                    _ => return Err(syn::Error::new_spanned(pair.path, "Unrecognized argument.")),
+                    _ => return Err(syn::Error::new_spanned(pair.path, "Unrecognized argument")),
                 },
-                _ => return Err(syn::Error::new_spanned(arg, "Not a key-value.")),
+                _ => return Err(syn::Error::new_spanned(arg, "Not a key-value")),
             }
         }
         Ok(result)
@@ -187,7 +187,7 @@ impl MarshalingRule {
                 segments: Punctuated::new(),
             })),
             "String" => Ok(Self::String),
-            _ => Err(syn::Error::new_spanned(src, "Invalid marshaling rule.")),
+            _ => Err(syn::Error::new_spanned(src, "Invalid marshaling rule")),
         }
     }
 
@@ -322,7 +322,7 @@ fn assert_type_is_path(src: &Type) -> syn::Result<&Path> {
     if let Type::Path(type_path) = src {
         Ok(&type_path.path)
     } else {
-        Err(syn::Error::new_spanned(src, "Expected a type path."))
+        Err(syn::Error::new_spanned(src, "Expected a type path"))
     }
 }
 
@@ -330,7 +330,7 @@ fn assert_lit_is_litstr(src: &Lit) -> syn::Result<&LitStr> {
     if let Lit::Str(litstr) = src {
         Ok(litstr)
     } else {
-        Err(syn::Error::new_spanned(src, "Invalid value."))
+        Err(syn::Error::new_spanned(src, "Invalid value"))
     }
 }
 
