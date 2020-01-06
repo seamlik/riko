@@ -4,6 +4,9 @@ name = "riko_sample"
 publish = false
 version = "0.0.1"
 
+[package.metadata.riko]
+targets = ["jni"]
+
 [lib]
 crate-type = ["cdylib"]
 

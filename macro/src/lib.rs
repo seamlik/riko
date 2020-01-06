@@ -2,14 +2,7 @@
 //!
 //! # Config
 //!
-//! In order to enable code generation, a config file called `Riko.toml` must be present alongside
-//! `Cargo.toml`. See [`Config`](riko_core::config::Config) for its fields.
-//!
-//! ## Root Section
-//!
-//! ## `[jni]` Section
-//!
-//! * `enabled`: Enable JNI bindings generation. Defaults to false.
+//! In order to enable code generation, at least 1 target must be specified in the package metadata.
 
 extern crate proc_macro;
 

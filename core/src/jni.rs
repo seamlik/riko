@@ -9,7 +9,6 @@ use crate::TargetCodeWriter;
 use itertools::Itertools;
 use quote::ToTokens;
 use std::path::Path;
-use std::path::PathBuf;
 
 const CLASS_FOR_MODULE: &str = "__riko_Module";
 
@@ -17,7 +16,6 @@ const CLASS_FOR_MODULE: &str = "__riko_Module";
 pub struct JniWriter;
 
 impl TargetCodeWriter for JniWriter {
-
     fn write_all(&self, root: &Crate, output_directory: &Path) -> Result<(), crate::Error> {
         for module in root.modules.iter() {
             let mut file_path = output_directory.to_owned();
@@ -183,8 +181,7 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let actual =
-            JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+        let actual = JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
 
         assert_eq!(
             crate::normalize_source_code(expected),
@@ -223,8 +220,7 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let actual =
-            JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+        let actual = JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
 
         assert_eq!(
             crate::normalize_source_code(expected),

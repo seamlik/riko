@@ -5,20 +5,15 @@ use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
 use serde::Deserialize;
-use std::collections::HashSet;
-use std::path::Path;
-use std::path::PathBuf;
+use serde_json::Value;
 use std::collections::BTreeSet;
+use std::collections::HashSet;
+use std::path::PathBuf;
 
-/// Filename of a Riko config.
-const FILENAME: &str = "Riko.toml";
-
-/// `Riko.toml`.
+/// Configuration.
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
-    // TODO: Use `Cargo.toml` package metadata
-
     /// What target code should be generated.
     pub targets: BTreeSet<String>,
 
@@ -37,26 +32,20 @@ impl Config {
             .iter()
             .filter(|x| workspace_members_ids.contains(&x.id))
         {
-            let config_path = pkg.manifest_path.with_file_name(FILENAME);
-            let mut config = Config::read(&config_path)
-                .with_context(|| format!("Failed to read config {}", config_path.display()))?;
+            let mut config: Config = match &pkg.metadata {
+                Value::Object(value) => {
+                    if let Some(raw) = value.get("riko") {
+                        serde_json::from_value::<Config>(raw.clone())?
+                    } else {
+                        Default::default()
+                    }
+                }
+                _ => Default::default(),
+            };
             config.expand_all_fields(pkg, &metadata)?;
             configs.push(config);
         }
         Ok(configs)
-    }
-
-    /// Reads config from filesystem.
-    ///
-    /// Returns a default config if the file is not found.
-    pub fn read(path: &Path) -> anyhow::Result<Self> {
-        if !path.is_file() {
-            return Ok(Default::default());
-        }
-
-        log::info!("Reading `{}`", path.display());
-        let config: Config = toml::from_slice(&std::fs::read(path)?)?;
-        Ok(config)
     }
 
     /// Fills in all optional fields, expands all relative filesystem paths, etc..
