@@ -22,7 +22,7 @@ use thiserror::Error;
 /// Target code generation.
 pub trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
-    fn write_all(&self, ir: &Crate) -> Result<(), Error>;
+    fn write_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error>;
 
     /// Generates target code for a function.
     fn write_function(&self, function: &Function, module: &Module, root: &Crate) -> String;
@@ -31,20 +31,29 @@ pub trait TargetCodeWriter {
     fn write_module(&self, module: &Module, root: &Crate) -> String;
 
     fn write_target_file(&self, path: &Path, content: &str) -> std::io::Result<()> {
-        let mut path_full = self.output_directory().to_owned();
-        path_full.push(path);
-        log::info!("Writing to `{}`", path_full.display());
+        log::info!("Writing to `{}`", path.display());
 
-        std::fs::create_dir_all(path_full.parent().unwrap())?;
+        std::fs::create_dir_all(path.parent().unwrap())?;
 
-        let mut file = File::create(path_full)?;
+        let mut file = File::create(path)?;
         file.write_all(content.as_bytes())?;
 
         Ok(())
     }
+}
 
-    /// The directory where the target code is written to.
-    fn output_directory(&self) -> &Path;
+/// This is where [TargetCodeWriter] implementations are registered.
+pub fn create_target_code_writers<'a>(
+    targets: impl Iterator<Item = &'a String>,
+) -> Vec<Box<dyn TargetCodeWriter>> {
+    let mut writers = Vec::<Box<dyn TargetCodeWriter>>::new();
+    for target in targets {
+        match target.as_str() {
+            "jni" => writers.push(Box::new(jni::JniWriter)),
+            _ => log::warn!("Unsupported target `{}`", target),
+        }
+    }
+    writers
 }
 
 /// Errors when parsing Rust code or writing target code.

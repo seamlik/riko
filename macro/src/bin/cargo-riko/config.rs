@@ -8,6 +8,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
+use std::collections::BTreeSet;
 
 /// Filename of a Riko config.
 const FILENAME: &str = "Riko.toml";
@@ -17,7 +18,9 @@ const FILENAME: &str = "Riko.toml";
 #[serde(default)]
 pub struct Config {
     // TODO: Use `Cargo.toml` package metadata
-    pub jni: JniConfig,
+
+    /// What target code should be generated.
+    pub targets: BTreeSet<String>,
 
     #[serde(skip)]
     pub cached: ConfigCachedFields,
@@ -101,12 +104,6 @@ impl Default for ConfigCachedFields {
             output_directory: ["target", "riko"].iter().collect(),
         }
     }
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default)]
-pub struct JniConfig {
-    pub enabled: bool, // TODO: Use `targets = ["jni", "pinvoke"]`
 }
 
 /// Minified version of a `Cargo.toml`.

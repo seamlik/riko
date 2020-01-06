@@ -14,21 +14,15 @@ use std::path::PathBuf;
 const CLASS_FOR_MODULE: &str = "__riko_Module";
 
 /// Writes JNI bindings.
-#[derive(Default)]
-pub struct JniWriter {
-    pub output_directory: PathBuf,
-}
+pub struct JniWriter;
 
 impl TargetCodeWriter for JniWriter {
-    fn output_directory(&self) -> &Path {
-        &self.output_directory
-    }
 
-    fn write_all(&self, root: &Crate) -> Result<(), crate::Error> {
+    fn write_all(&self, root: &Crate, output_directory: &Path) -> Result<(), crate::Error> {
         for module in root.modules.iter() {
-            let mut file_path = std::iter::once(&root.name)
-                .chain(module.path.iter())
-                .collect::<PathBuf>();
+            let mut file_path = output_directory.to_owned();
+            file_path.push(&root.name);
+            file_path.extend(module.path.iter());
             file_path.push(format!("{}.java", CLASS_FOR_MODULE));
 
             self.write_target_file(&file_path, &self.write_module(module, root))
@@ -162,7 +156,7 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let actual = JniWriter::default().write_module(&ir.modules[0], &ir);
+        let actual = JniWriter.write_module(&ir.modules[0], &ir);
         assert_eq!(
             crate::normalize_source_code(expected),
             crate::normalize_source_code(&actual),
@@ -190,7 +184,7 @@ mod tests {
             }],
         };
         let actual =
-            JniWriter::default().write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+            JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
 
         assert_eq!(
             crate::normalize_source_code(expected),
@@ -230,7 +224,7 @@ mod tests {
             }],
         };
         let actual =
-            JniWriter::default().write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+            JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
 
         assert_eq!(
             crate::normalize_source_code(expected),
