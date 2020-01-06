@@ -12,7 +12,7 @@
   <packaging>pom</packaging>
 
   <modules>
-    <module>runtime-java</module>
+    <module>runtime-jni</module>
     <module>sample-jni</module>
   </modules>
 </project>
