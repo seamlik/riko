@@ -5,7 +5,7 @@
 
 use crate::parse::Fun;
 use crate::parse::MarshalingRule;
-use anyhow::Context;
+use crate::ErrorSource;
 use quote::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
@@ -32,11 +32,16 @@ pub struct Crate {
 }
 
 impl Crate {
-    pub fn parse(src: &Path, name: String) -> anyhow::Result<Self> {
-        let raw = std::fs::read_to_string(src).with_context(|| src.display().to_string())?;
-        let file = syn::parse_file(&raw).with_context(|| src.display().to_string())?;
-        let modules = Module::parse_items(&file.items, &[], src)
-            .with_context(|| src.display().to_string())?;
+    pub fn parse(src: &Path, name: String) -> Result<Self, crate::Error> {
+        let raw = std::fs::read_to_string(src).map_err(|err| crate::Error {
+            file: src.to_owned(),
+            source: ErrorSource::ReadSource(err),
+        })?;
+        let file = syn::parse_file(&raw).map_err(|err| crate::Error {
+            file: src.to_owned(),
+            source: ErrorSource::Parse(err),
+        })?;
+        let modules = Module::parse_items(&file.items, &[], src)?;
         Ok(Self { modules, name })
     }
 }
@@ -65,7 +70,7 @@ impl Module {
         items: &[Item],
         module_path: &[String],
         file_path: &Path,
-    ) -> anyhow::Result<Vec<Self>> {
+    ) -> Result<Vec<Self>, crate::Error> {
         let mut result = Vec::<Self>::new();
         let mut functions = Vec::<Function>::new();
 
@@ -77,7 +82,10 @@ impl Module {
                         .iter()
                         .any(|x| x.path.to_token_stream().to_string() == "riko :: fun")
                     {
-                        functions.push(Function::parse(inner)?)
+                        functions.push(Function::parse(inner).map_err(|err| crate::Error {
+                            file: file_path.to_owned(),
+                            source: ErrorSource::Riko(err),
+                        })?)
                     }
                 }
                 Item::Mod(inner) => {
@@ -109,7 +117,7 @@ impl Module {
         module: &ItemMod,
         module_path_parent: &[String],
         file_path_parent: &Path,
-    ) -> anyhow::Result<Vec<Self>> {
+    ) -> Result<Vec<Self>, crate::Error> {
         let module_name_child = module.ident.to_string();
 
         let mut module_path_child: Vec<String> = module_path_parent.into();
@@ -121,10 +129,17 @@ impl Module {
         if let Some((_, items)) = &module.content {
             Self::parse_items(items, &module_path_child, &file_path_parent)
         } else {
-            let raw = std::fs::read_to_string(&file_path_child)
-                .with_context(|| file_path_child.display().to_string())?;
-            let ast =
-                syn::parse_file(&raw).with_context(|| file_path_child.display().to_string())?;
+            let raw = std::fs::read_to_string(&file_path_child).map_err(|err| crate::Error {
+                file: file_path_parent.to_owned(),
+                source: ErrorSource::ReadExternalModule(Box::new(crate::Error {
+                    file: file_path_child.to_owned(),
+                    source: ErrorSource::ReadSource(err),
+                })),
+            })?;
+            let ast = syn::parse_file(&raw).map_err(|err| crate::Error {
+                file: file_path_child.to_owned(),
+                source: ErrorSource::Parse(err),
+            })?;
             Self::parse_items(&ast.items, &module_path_child, &file_path_child)
         }
     }

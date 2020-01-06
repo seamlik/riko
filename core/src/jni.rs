@@ -4,8 +4,8 @@ use crate::ir::Crate;
 use crate::ir::Function;
 use crate::ir::Module;
 use crate::parse::MarshalingRule;
+use crate::ErrorSource;
 use crate::TargetCodeWriter;
-use anyhow::Context;
 use itertools::Itertools;
 use quote::ToTokens;
 use std::path::Path;
@@ -24,26 +24,23 @@ impl TargetCodeWriter for JniWriter {
         &self.output_directory
     }
 
-    fn target_name() -> &'static str {
-        "jni"
-    }
-
-    fn write_all(&self, root: &Crate) -> anyhow::Result<()> {
+    fn write_all(&self, root: &Crate) -> Result<(), crate::Error> {
         for module in root.modules.iter() {
             let mut file_path = std::iter::once(&root.name)
                 .chain(module.path.iter())
                 .collect::<PathBuf>();
             file_path.push(format!("{}.java", CLASS_FOR_MODULE));
 
-            self.write_target_file(&file_path, &self.write_module(module, root)?)
-                .with_context(|| {
-                    format!("Failed to write to target file: {}", file_path.display())
+            self.write_target_file(&file_path, &self.write_module(module, root))
+                .map_err(|err| crate::Error {
+                    file: file_path,
+                    source: ErrorSource::Write(err),
                 })?;
         }
         Ok(())
     }
 
-    fn write_function(&self, function: &Function, _: &Module, _: &Crate) -> syn::Result<String> {
+    fn write_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
         let return_type_native = if function.output.is_none() {
             "void"
         } else {
@@ -85,7 +82,7 @@ impl TargetCodeWriter for JniWriter {
             .map(|idx| format!("final {} arg_{}", return_type_java, idx))
             .join(", ");
 
-        Ok(format!(
+        format!(
             r#"
                 private static native {return_type_native} {name_internal}( {params_native} );
                 public static {return_type_java} {name_public}( {params_java} ) {{
@@ -102,20 +99,20 @@ impl TargetCodeWriter for JniWriter {
             return_prefix = return_prefix,
             return_type_java = return_type_java,
             return_type_native = return_type_native
-        ))
+        )
     }
 
-    fn write_module(&self, module: &Module, root: &Crate) -> syn::Result<String> {
+    fn write_module(&self, module: &Module, root: &Crate) -> String {
         let mut body = Vec::<String>::new();
         for function in module.functions.iter() {
-            body.push(self.write_function(function, module, root)?);
+            body.push(self.write_function(function, module, root));
         }
 
         let result_package = std::iter::once(&root.name)
             .chain(module.path.iter())
             .join(".");
 
-        Ok(format!(
+        format!(
             r#"
                 package {package};
 
@@ -129,8 +126,7 @@ impl TargetCodeWriter for JniWriter {
             body = body.as_slice().join("\n"),
             class = CLASS_FOR_MODULE,
             package = &result_package,
-        ))
-
+        )
     }
 }
 
