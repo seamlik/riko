@@ -33,6 +33,7 @@ pub struct Crate {
 
 impl Crate {
     pub fn parse(src: &Path, name: String) -> Result<Self, crate::Error> {
+        log::info!("Reading `{}`", src.display());
         let raw = std::fs::read_to_string(src).map_err(|err| crate::Error {
             file: src.to_owned(),
             source: ErrorSource::ReadSource(err),
@@ -129,6 +130,7 @@ impl Module {
         if let Some((_, items)) = &module.content {
             Self::parse_items(items, &module_path_child, &file_path_parent)
         } else {
+            log::info!("Reading `{}`", file_path_child.display());
             let raw = std::fs::read_to_string(&file_path_child).map_err(|err| crate::Error {
                 file: file_path_parent.to_owned(),
                 source: ErrorSource::ReadExternalModule(Box::new(crate::Error {

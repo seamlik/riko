@@ -51,6 +51,7 @@ impl Config {
             return Ok(Default::default());
         }
 
+        log::info!("Reading `{}`", path.display());
         let config: Config = toml::from_slice(&std::fs::read(path)?)?;
         Ok(config)
     }

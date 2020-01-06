@@ -33,6 +33,7 @@ pub trait TargetCodeWriter {
     fn write_target_file(&self, path: &Path, content: &str) -> std::io::Result<()> {
         let mut path_full = self.output_directory().to_owned();
         path_full.push(path);
+        log::info!("Writing to `{}`", path_full.display());
 
         std::fs::create_dir_all(path_full.parent().unwrap())?;
 
