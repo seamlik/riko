@@ -10,12 +10,9 @@ version = "0.0.1"
 [dependencies]
 anyhow = "1"
 blake2 = "0"
-cargo_metadata = "0"
 data-encoding = "2"
 itertools = "0"
 proc-macro2 = "1"
 quote = "1"
 regex = { version = "1", features = ["pattern"] }
-serde = { version = "1", features = ["derive"] }
 syn = { version = "1", features = ["full"] }
-toml = "0"

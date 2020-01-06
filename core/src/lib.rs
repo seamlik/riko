@@ -2,12 +2,10 @@
 
 #![feature(drain_filter)]
 
-pub mod config;
 pub mod ir;
 pub mod jni;
 pub mod parse;
 
-use config::Config;
 use ir::Crate;
 use ir::Function;
 use ir::Module;
@@ -17,7 +15,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 /// Target code generation.
-pub trait TargetCodeWriter<'cfg> {
+pub trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
     fn write_all(&self, ir: &Crate) -> anyhow::Result<()>;
 
@@ -32,14 +30,8 @@ pub trait TargetCodeWriter<'cfg> {
     /// Generates target code for a module.
     fn write_module(&self, module: &Module, root: &Crate) -> syn::Result<String>;
 
-    /// Gets the associated [Config].
-    fn config(&self) -> &'cfg Config;
-
-    fn target_name() -> &'static str;
-
     fn write_target_file(&self, path: &Path, content: &str) -> std::io::Result<()> {
-        let mut path_full = self.config().cached.output_directory.to_owned();
-        path_full.push(Self::target_name());
+        let mut path_full = self.output_directory().to_owned();
         path_full.push(path);
 
         std::fs::create_dir_all(path_full.parent().unwrap())?;
@@ -50,7 +42,10 @@ pub trait TargetCodeWriter<'cfg> {
         Ok(())
     }
 
-    fn new(config: &'cfg Config) -> Self;
+    /// The directory where the target code is written to.
+    fn output_directory(&self) -> &Path;
+}
+
 }
 
 fn normalize_source_code(code: &str) -> String {

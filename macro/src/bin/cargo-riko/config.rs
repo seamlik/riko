@@ -82,7 +82,7 @@ impl Config {
 
 /// Fields not in a Cargo config but cached for further uses.
 pub struct ConfigCachedFields {
-    /// Where Riko places all its generated target code.
+    /// Where Cargo places all its generated target code.
     pub output_directory: PathBuf,
 
     /// Crate name.

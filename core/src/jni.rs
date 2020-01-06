@@ -1,6 +1,5 @@
 //! Java support using JNI.
 
-use crate::config::Config;
 use crate::ir::Crate;
 use crate::ir::Function;
 use crate::ir::Module;
@@ -9,18 +8,20 @@ use crate::TargetCodeWriter;
 use anyhow::Context;
 use itertools::Itertools;
 use quote::ToTokens;
+use std::path::Path;
 use std::path::PathBuf;
 
 const CLASS_FOR_MODULE: &str = "__riko_Module";
 
 /// Writes JNI bindings.
-pub struct JniWriter<'cfg> {
-    config: &'cfg Config,
+#[derive(Default)]
+pub struct JniWriter {
+    pub output_directory: PathBuf,
 }
 
-impl<'cfg> TargetCodeWriter<'cfg> for JniWriter<'cfg> {
-    fn config(&self) -> &'cfg Config {
-        self.config
+impl TargetCodeWriter for JniWriter {
+    fn output_directory(&self) -> &Path {
+        &self.output_directory
     }
 
     fn target_name() -> &'static str {
@@ -129,10 +130,7 @@ impl<'cfg> TargetCodeWriter<'cfg> for JniWriter<'cfg> {
             class = CLASS_FOR_MODULE,
             package = &result_package,
         ))
-    }
 
-    fn new(config: &'cfg Config) -> Self {
-        Self { config }
     }
 }
 
@@ -168,11 +166,10 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let config = Config::default();
-        let writer = JniWriter::new(&config);
+        let actual = JniWriter::default().write_module(&ir.modules[0], &ir);
         assert_eq!(
             crate::normalize_source_code(expected),
-            crate::normalize_source_code(&writer.write_module(&ir.modules[0], &ir).unwrap()),
+            crate::normalize_source_code(&actual),
         );
     }
 
@@ -196,15 +193,12 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let config = Config::default();
-        let writer = JniWriter::new(&config);
+        let actual =
+            JniWriter::default().write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+
         assert_eq!(
             crate::normalize_source_code(expected),
-            crate::normalize_source_code(
-                &writer
-                    .write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
-                    .unwrap()
-            ),
+            crate::normalize_source_code(&actual),
         );
     }
 
@@ -239,15 +233,12 @@ mod tests {
                 path: vec!["example".into()],
             }],
         };
-        let config = Config::default();
-        let writer = JniWriter::new(&config);
+        let actual =
+            JniWriter::default().write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+
         assert_eq!(
             crate::normalize_source_code(expected),
-            crate::normalize_source_code(
-                &writer
-                    .write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
-                    .unwrap()
-            ),
+            crate::normalize_source_code(&actual),
         );
     }
 }
