@@ -36,7 +36,7 @@ pub fn mangle_function_name(function: &ItemFn) -> Ident {
     body_hasher.input(body.as_bytes());
     let body_hash = HEXLOWER.encode(&body_hasher.vec_result());
 
-    quote::format_ident!("__riko_{}_{}", function.sig.ident.to_string(), body_hash)
+    quote::format_ident!("{}_{}", function.sig.ident.to_string(), body_hash)
 }
 
 /// Attributes for `#[fun]`.

@@ -40,6 +40,8 @@ pub trait TargetCodeWriter {
 
         Ok(())
     }
+
+    fn write_bridges(&self, root: &Crate) -> String;
 }
 
 /// This is where [TargetCodeWriter] implementations are registered.

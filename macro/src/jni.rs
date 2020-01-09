@@ -115,7 +115,11 @@ impl MacroExpander for JniExpander {
 
 fn mangle_function_name(function: &ItemFn) -> Ident {
     let raw = riko_core::parse::mangle_function_name(function);
-    quote::format_ident!("Java_{}", raw.to_string().replace("_", "_1"))
+    quote::format_ident!(
+        "Java_{}_{}",
+        riko_core::jni::PACKAGE_FOR_BRIDGE.replace("_", "_1"),
+        raw.to_string().replace("_", "_1")
+    )
 }
 
 mod tests {

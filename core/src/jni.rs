@@ -11,12 +11,14 @@ use quote::ToTokens;
 use std::path::Path;
 
 const CLASS_FOR_MODULE: &str = "__riko_Module";
+pub const PACKAGE_FOR_BRIDGE: &str = "__riko_bridge";
 
 /// Writes JNI bindings.
 pub struct JniWriter;
 
 impl TargetCodeWriter for JniWriter {
     fn write_all(&self, root: &Crate, output_directory: &Path) -> Result<(), crate::Error> {
+        // Modules
         for module in root.modules.iter() {
             let mut file_path = output_directory.to_owned();
             file_path.push(&root.name);
@@ -29,15 +31,21 @@ impl TargetCodeWriter for JniWriter {
                     source: ErrorSource::Write(err),
                 })?;
         }
+
+        // Bridges
+        let mut file_path_bridge = output_directory.to_owned();
+        file_path_bridge.push(&root.name);
+        file_path_bridge.push(PACKAGE_FOR_BRIDGE);
+        file_path_bridge.push(format!("{}.java", CLASS_FOR_MODULE));
+        self.write_target_file(&file_path_bridge, &self.write_bridges(root))
+            .map_err(|err| crate::Error {
+                file: file_path_bridge,
+                source: ErrorSource::Write(err),
+            })?;
         Ok(())
     }
 
-    fn write_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
-        let return_type_native = if function.output.is_none() {
-            "void"
-        } else {
-            "byte[]"
-        };
+    fn write_function(&self, function: &Function, _: &Module, root: &Crate) -> String {
         let return_type_result = match &function.output {
             None => "void".into(),
             Some(MarshalingRule::Iterator(_)) => return_type(&MarshalingRule::I32),
@@ -67,30 +75,62 @@ impl TargetCodeWriter for JniWriter {
         let args = (0..(function.inputs.len()))
             .map(|idx| format!("riko.Marshaler.toBytes(arg_{})", idx))
             .join(", ");
-        let params_native = (0..(function.inputs.len()))
-            .map(|idx| format!("byte[] arg_{}", idx))
-            .join(", ");
-        let params_java = (0..(function.inputs.len()))
+        let params = (0..(function.inputs.len()))
             .map(|idx| format!("final {} arg_{}", return_type_java, idx))
             .join(", ");
 
         format!(
             r#"
-                private static native {return_type_native} {name_internal}( {params_native} );
-                public static {return_type_java} {name_public}( {params_java} ) {{
-                    {return_prefix} {name_internal}( {args} );
+                public static {return_type_java} {name_public}( {params} ) {{
+                    {return_prefix} {crate_name}.{package_bridge}.{module}.{name_bridge}( {args} );
                     {return_block}
                 }}
             "#,
             args = args,
-            name_internal = &function.name_internal,
+            crate_name = root.name,
+            module = CLASS_FOR_MODULE,
+            name_bridge = &function.name_bridge,
             name_public = &function.name_public,
-            params_java = params_java,
-            params_native = params_native,
+            package_bridge = PACKAGE_FOR_BRIDGE,
+            params = params,
             return_block = return_block,
             return_prefix = return_prefix,
             return_type_java = return_type_java,
-            return_type_native = return_type_native
+        )
+    }
+
+    fn write_bridges(&self, root: &Crate) -> String {
+        let body = root
+            .bridges
+            .iter()
+            .map(|b| {
+                let return_type = if b.output { "byte[]" } else { "void" };
+                let params = (0..b.input)
+                    .map(|idx| format!("byte[] arg_{}", idx))
+                    .join(", ");
+                // Put `\n` at the beginning so the output can be sightly prettier.
+                format!(
+                    "\npublic static native {return_type} {name}( {params} );",
+                    name = &b.name,
+                    params = params,
+                    return_type = return_type,
+                )
+            })
+            .join("");
+
+        format!(
+            r#"
+                package {crate_name}.{package};
+
+                public final class {class} {{
+                    private {class}() {{}}
+                    {body}
+                }}
+            "#,
+            body = body,
+            class = CLASS_FOR_MODULE,
+            crate_name = &root.name,
+            package = PACKAGE_FOR_BRIDGE,
         )
     }
 
@@ -137,6 +177,7 @@ fn return_type(rule: &MarshalingRule) -> String {
 
 mod tests {
     use super::*;
+    use crate::ir::*;
 
     #[test]
     fn module_nothing() {
@@ -148,6 +189,7 @@ mod tests {
             }
         "#;
         let ir = Crate {
+            bridges: vec![],
             name: "riko_sample".into(),
             modules: vec![Module {
                 functions: vec![],
@@ -164,17 +206,17 @@ mod tests {
     #[test]
     fn function_nothing() {
         let expected = r#"
-            private static native void xxx( );
             public static void function( ) {
-                xxx( );
+                riko_sample.__riko_bridge.__riko_Module.xxx( );
             }
         "#;
         let ir = Crate {
+            bridges: vec![],
             name: "riko_sample".into(),
             modules: vec![Module {
                 functions: vec![Function {
                     name_public: "function".into(),
-                    name_internal: "xxx".into(),
+                    name_bridge: "xxx".into(),
                     inputs: vec![],
                     output: None,
                 }],
@@ -192,15 +234,11 @@ mod tests {
     #[test]
     fn function_simple() {
         let expected = r#"
-            private static native byte[] xxx(
-                byte[] arg_0,
-                byte[] arg_1
-            );
             public static java.lang.String function(
                 final java.lang.String arg_0,
                 final java.lang.String arg_1
             ) {
-                final byte[] returned = xxx(
+                final byte[] returned = riko_sample.__riko_bridge.__riko_Module.xxx(
                     riko.Marshaler.toBytes(arg_0),
                     riko.Marshaler.toBytes(arg_1)
                 );
@@ -209,11 +247,12 @@ mod tests {
             }
         "#;
         let ir = Crate {
+            bridges: vec![],
             name: "riko_sample".into(),
             modules: vec![Module {
                 functions: vec![Function {
                     name_public: "function".into(),
-                    name_internal: "xxx".into(),
+                    name_bridge: "xxx".into(),
                     inputs: vec![MarshalingRule::String, MarshalingRule::String],
                     output: Some(MarshalingRule::String),
                 }],
@@ -221,6 +260,43 @@ mod tests {
             }],
         };
         let actual = JniWriter.write_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+
+        assert_eq!(
+            crate::normalize_source_code(expected),
+            crate::normalize_source_code(&actual),
+        );
+    }
+
+    #[test]
+    fn bridge() {
+        let expected = r#"
+            package riko_sample.__riko_bridge;
+
+            public final class __riko_Module {
+                private __riko_Module() {}
+
+                public static native void xxx( );
+                public static native byte[] yyy( byte[] arg_0, byte[] arg_1 );
+            }
+        "#;
+
+        let ir = Crate {
+            name: "riko_sample".into(),
+            modules: vec![],
+            bridges: vec![
+                Bridge {
+                    name: "xxx".into(),
+                    input: 0,
+                    output: false,
+                },
+                Bridge {
+                    name: "yyy".into(),
+                    input: 2,
+                    output: true,
+                },
+            ],
+        };
+        let actual = JniWriter.write_bridges(&ir);
 
         assert_eq!(
             crate::normalize_source_code(expected),
