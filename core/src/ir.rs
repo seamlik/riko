@@ -180,8 +180,7 @@ impl Function {
         let attr = item
             .attrs
             .iter()
-            .filter(|x| x.path.to_token_stream().to_string() == "riko :: fun")
-            .nth(0)
+            .find(|x| x.path.to_token_stream().to_string() == "riko :: fun")
             .unwrap();
         let mut args: Fun = if attr.tokens.is_empty() {
             Default::default()

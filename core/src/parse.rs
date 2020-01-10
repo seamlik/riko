@@ -242,7 +242,7 @@ impl MarshalingRule {
                     .drain_filter(|attr| {
                         attr.path.to_token_stream().to_string() == "riko :: marshal"
                     })
-                    .nth(0);
+                    .next();
                 if let Some(attr) = marshal_attr {
                     result.push(syn::parse2::<MarshalAttrArgs>(attr.tokens)?.rule);
                 } else {
