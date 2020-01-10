@@ -192,7 +192,7 @@ impl Function {
         let mut item_stripped = item.clone(); // TODO: Don't clone
         let inputs = MarshalingRule::parse(item_stripped.sig.inputs.iter_mut())?;
 
-        let name_bridge = crate::parse::mangle_function_name(item).to_string();
+        let name_bridge = crate::parse::mangle_function_name(item);
 
         let bridge = Bridge {
             input: item.sig.inputs.len(),
@@ -238,7 +238,7 @@ mod test {
                 unimplemented!()
             }
         };
-        let name_bridge = crate::parse::mangle_function_name(&function).to_string();
+        let name_bridge = crate::parse::mangle_function_name(&function);
 
         let expected_function = Function {
             inputs: vec![MarshalingRule::String, MarshalingRule::String],

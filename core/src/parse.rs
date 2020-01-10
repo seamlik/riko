@@ -27,7 +27,7 @@ use syn::Type;
 use syn::TypePath;
 
 /// Generates a mangled function name to be invoked by target code.
-pub fn mangle_function_name(function: &ItemFn) -> Ident {
+pub fn mangle_function_name(function: &ItemFn) -> String {
     let mut function_without_attr = function.clone();
     function_without_attr.attrs.clear();
 
@@ -36,7 +36,7 @@ pub fn mangle_function_name(function: &ItemFn) -> Ident {
     body_hasher.input(body.as_bytes());
     let body_hash = HEXLOWER.encode(&body_hasher.vec_result());
 
-    quote::format_ident!("{}_{}", function.sig.ident.to_string(), body_hash)
+    format!("{}_{}", function.sig.ident.to_string(), body_hash)
 }
 
 /// Attributes for `#[fun]`.

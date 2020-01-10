@@ -16,7 +16,7 @@ impl MacroExpander for JniExpander {
     fn fun(&self, item: &mut ItemFn, args: &Fun) -> TokenStream {
         // Name of the generated function
         let original_name = &item.sig.ident;
-        let result_name = mangle_function_name(item);
+        let result_name = quote::format_ident!("{}", mangle_function_name(item));
 
         // Remove all `#[riko::marshal]`
         if let Err(err) = MarshalingRule::parse(item.sig.inputs.iter_mut()) {
@@ -133,7 +133,7 @@ mod tests {
         let args: Fun = syn::parse_quote! {
             name = "function",
         };
-        let mangled_name = mangle_function_name(&function);
+        let mangled_name = quote::format_ident!("{}", mangle_function_name(&function));
 
         let actual = JniExpander.fun(&mut function, &args).to_string();
         let expected = quote! {
@@ -164,7 +164,7 @@ mod tests {
             name = "function",
             marshal = "String",
         };
-        let mangled_name = mangle_function_name(&function);
+        let mangled_name = quote::format_ident!("{}", mangle_function_name(&function));
 
         let actual = JniExpander.fun(&mut function, &args).to_string();
         let expected = quote! {
@@ -202,7 +202,7 @@ mod tests {
             name = "function",
             marshal = "Iterator<String>",
         };
-        let mangled_name = mangle_function_name(&function);
+        let mangled_name = quote::format_ident!("{}", mangle_function_name(&function));
 
         let actual = JniExpander.fun(&mut function, &args).to_string();
         let expected = quote! {
