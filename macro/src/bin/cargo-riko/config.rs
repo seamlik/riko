@@ -1,6 +1,5 @@
 //! Configuration.
 
-use anyhow::Context;
 use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
@@ -42,34 +41,25 @@ impl Config {
                 }
                 _ => Default::default(),
             };
-            config.expand_all_fields(pkg, &metadata)?;
+            config.expand_all_fields(pkg, &metadata);
             configs.push(config);
         }
         Ok(configs)
     }
 
     /// Fills in all optional fields, expands all relative filesystem paths, etc..
-    fn expand_all_fields(&mut self, package: &Package, metadata: &Metadata) -> anyhow::Result<()> {
-        let cargo_config_raw = std::fs::read(&package.manifest_path)
-            .with_context(|| package.manifest_path.display().to_string())?;
-        let cargo_config: CargoConfig = toml::from_slice(&cargo_config_raw)
-            .with_context(|| package.manifest_path.display().to_string())?;
-
+    fn expand_all_fields(&mut self, package: &Package, metadata: &Metadata) {
         self.cached.crate_name = package.name.clone();
 
         self.cached.output_directory = metadata.target_directory.clone();
         self.cached.output_directory.push("riko");
 
-        self.cached.entry = if cargo_config.lib.path.is_absolute() {
-            cargo_config.lib.path
-        } else {
-            let mut entry: PathBuf = package.manifest_path.to_owned();
-            entry.pop();
-            entry.extend(cargo_config.lib.path.iter());
-            entry
-        };
-
-        Ok(())
+        self.cached.entry = package
+            .targets
+            .iter()
+            .find(|t| t.kind == vec!["lib"])
+            .map(|t| t.src_path.clone())
+            .unwrap_or_default();
     }
 }
 
@@ -82,6 +72,8 @@ pub struct ConfigCachedFields {
     pub crate_name: String,
 
     /// Entry source file of this crate.
+    ///
+    /// An empty path if the package does not have a `lib` target.
     pub entry: PathBuf,
 }
 
@@ -91,27 +83,6 @@ impl Default for ConfigCachedFields {
             crate_name: Default::default(),
             entry: Default::default(),
             output_directory: ["target", "riko"].iter().collect(),
-        }
-    }
-}
-
-/// Minified version of a `Cargo.toml`.
-#[derive(Deserialize, Default)]
-#[serde(default)]
-struct CargoConfig {
-    lib: CargoConfigLib,
-}
-
-#[derive(Deserialize)]
-#[serde(default)]
-struct CargoConfigLib {
-    path: PathBuf,
-}
-
-impl Default for CargoConfigLib {
-    fn default() -> Self {
-        Self {
-            path: ["src", "lib.rs"].iter().collect(),
         }
     }
 }

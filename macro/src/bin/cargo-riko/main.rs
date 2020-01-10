@@ -9,8 +9,14 @@ pub fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let configs = Config::read_all_configs()?;
-    for config in configs.iter() {
+    for config in Config::read_all_configs()?.iter() {
+        if format!("{}", config.cached.entry.display()).is_empty() {
+            log::info!(
+                "Package {} does not have a `lib` target, skipping.",
+                &config.cached.crate_name
+            );
+            continue;
+        }
         for writer in riko_core::create_target_code_writers(config.targets.iter()).into_iter() {
             let ir = Crate::parse(&config.cached.entry, config.cached.crate_name.clone())?;
 
