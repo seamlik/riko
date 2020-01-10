@@ -2,8 +2,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <properties>
+    <junit.version>5.5.2</junit.version>
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
+    <surefire.version>2.22.2</surefire.version>
   </properties>
 
   <groupId>riko</groupId>
