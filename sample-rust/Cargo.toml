@@ -15,4 +15,4 @@ jni = "0"
 once_cell = "1"
 riko = { path = "../macro" }
 riko_runtime = { path = "../runtime-rust" }
-serde = { version = "1.0.98", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
