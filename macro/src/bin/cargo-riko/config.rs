@@ -6,7 +6,6 @@ use cargo_metadata::Package;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// Configuration.
@@ -24,12 +23,11 @@ impl Config {
     /// Reads the top-level `Cargo.toml` and reads the `Riko.toml` of all crates in the workspace.
     pub fn read_all_configs() -> anyhow::Result<Vec<Config>> {
         let metadata = MetadataCommand::new().exec()?;
-        let workspace_members_ids = metadata.workspace_members.iter().collect::<HashSet<_>>();
         let mut configs = Vec::new();
         for pkg in metadata
             .packages
             .iter()
-            .filter(|x| workspace_members_ids.contains(&x.id))
+            .filter(|x| metadata.workspace_members.contains(&x.id))
         {
             let mut config: Config = match &pkg.metadata {
                 Value::Object(value) => {
