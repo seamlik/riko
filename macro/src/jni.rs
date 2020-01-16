@@ -118,7 +118,7 @@ fn mangle_function_name(function: &ItemFn) -> Ident {
     quote::format_ident!(
         "Java_{}_{}",
         riko_core::jni::PACKAGE_FOR_BRIDGE.replace("_", "_1"),
-        raw.to_string().replace("_", "_1")
+        raw.replace("_", "_1")
     )
 }
 
