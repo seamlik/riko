@@ -57,7 +57,7 @@ impl Config {
         self.cached.entry = package
             .targets
             .iter()
-            .find(|t| t.kind == vec!["lib"])
+            .find(|t| t.kind == vec!["cdylib"])
             .map(|t| t.src_path.clone())
             .unwrap_or_default();
     }
@@ -73,7 +73,7 @@ pub struct ConfigCachedFields {
 
     /// Entry source file of this crate.
     ///
-    /// An empty path if the package does not have a `lib` target.
+    /// An empty path if the package does not have a proper target.
     pub entry: PathBuf,
 }
 
