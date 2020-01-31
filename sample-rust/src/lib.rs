@@ -4,6 +4,8 @@ mod bridge;
 mod heaped;
 //mod serde;
 
+use serde_bytes::ByteBuf;
+
 #[riko::fun]
 fn nothing() {}
 
@@ -33,7 +35,7 @@ fn string(a: String, b: String) -> String {
 }
 
 #[riko::fun]
-fn bytes(mut x: Vec<u8>, y: Vec<u8>) -> Vec<u8> {
+fn bytes(mut x: ByteBuf, y: ByteBuf) -> ByteBuf {
     x.extend(y);
     x
 }

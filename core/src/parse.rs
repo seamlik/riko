@@ -111,9 +111,10 @@ pub enum MarshalingRule {
     /// Marshals a boolean value.
     Bool,
 
-    /// Marshals a byte array, namely `Vec<u8>`.
+    /// Marshals specifically a byte array instead of a collection of [u8].
     ///
-    /// This rule exists because it is commonly used.
+    /// Only `ByteBuf` from [serde_bytes](https://crates.io/crates/serde_bytes) is supported for
+    /// this rule.
     Bytes,
 
     /// Marshals an [i8].
@@ -156,7 +157,7 @@ impl MarshalingRule {
     pub fn to_rust_return_type(&self) -> Type {
         match self {
             Self::Bool => syn::parse_quote! { bool },
-            Self::Bytes => syn::parse_quote! { ::std::vec::Vec<u8> },
+            Self::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
             Self::I8 => syn::parse_quote! { i8 },
             Self::I32 => syn::parse_quote! { i32 },
             Self::I64 => syn::parse_quote! { i64 },
@@ -183,7 +184,7 @@ impl MarshalingRule {
             "i64" => Ok(Self::I64),
             "i8" => Ok(Self::I8),
             "std :: string :: String" | "String" => Ok(Self::String),
-            "std :: vec :: Vec < u8 >" | "Vec < u8 >" => Ok(Self::Bytes),
+            "serde_bytes :: ByteBuf" | "ByteBuf" => Ok(Self::Bytes),
             _ => Ok(Self::Serde(type_path.clone())),
             // TODO: Result & Option
         }
@@ -295,15 +296,15 @@ mod tests {
     #[test]
     fn MarshalingRule_infer() {
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { Vec<u8> }).unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! { ByteBuf }).unwrap(),
             MarshalingRule::Bytes
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { std::vec::Vec<u8> }).unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! { serde_bytes::ByteBuf }).unwrap(),
             MarshalingRule::Bytes
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { ::std::vec::Vec<u8> }).unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! { ::serde_bytes::ByteBuf }).unwrap(),
             MarshalingRule::Bytes
         );
 
