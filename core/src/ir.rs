@@ -14,15 +14,41 @@ use syn::FnArg;
 use syn::Item;
 use syn::ItemFn;
 use syn::ItemMod;
+use syn::Lit;
+use syn::Meta;
 use syn::Type;
 
-fn resolve_module_path(file_path_parent: &Path, module_name_child: &str) -> PathBuf {
-    let mut result = file_path_parent.with_file_name(format!("{}.rs", module_name_child));
-    if !result.is_file() {
-        result.set_file_name(module_name_child);
-        result.push("mod.rs");
+fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
+    if let Some(attr) = module_child
+        .attrs
+        .iter()
+        .find(|attr| attr.path.to_token_stream().to_string() == "path")
+    {
+        if let Meta::NameValue(nv) = attr.parse_meta()? {
+            if let Lit::Str(lit) = nv.lit {
+                let file_path_child: PathBuf = lit.value().into();
+                let mut result = file_path_parent;
+                result.pop();
+                result.extend(&file_path_child);
+                Ok(result)
+            } else {
+                Err(syn::Error::new_spanned(
+                    nv.lit,
+                    "Expect a file path literal",
+                ))
+            }
+        } else {
+            Err(syn::Error::new_spanned(attr, "Expect a name-value pair"))
+        }
+    } else {
+        let mut result = file_path_parent;
+        result.set_file_name(format!("{}.rs", module_child.ident.to_string()));
+        if !result.is_file() {
+            result.set_file_name(module_child.ident.to_string());
+            result.push("mod.rs");
+        }
+        Ok(result)
     }
-    result
 }
 
 /// Crate.
@@ -130,8 +156,13 @@ impl Module {
         let mut module_path_child: Vec<String> = module_path_parent.into();
         module_path_child.push(module_name_child.clone());
 
-        // TODO: Support `#[path]` on external modules
-        let file_path_child = resolve_module_path(file_path_parent, &module_name_child);
+        let file_path_child =
+            resolve_module_path(file_path_parent.to_owned(), module).map_err(|err| {
+                crate::Error {
+                    file: file_path_parent.to_owned(),
+                    source: ErrorSource::Parse(err),
+                }
+            })?;
 
         if let Some((_, items)) = &module.content {
             Self::parse_items(items, &module_path_child, &file_path_parent)
