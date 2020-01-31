@@ -125,21 +125,6 @@ pub enum MarshalingRule {
     /// Marshals an [i64].
     I64,
 
-    /// Marshals an [Iterator].
-    ///
-    /// It exists because it is a performance issue to marshal a very large byte array across the
-    /// FFI. Another reason is that some libraries provides event subscriptions in the form of
-    /// [Iterator]s instead of `Stream`s.
-    ///
-    /// For now, it only supports [Iterator]s with a static lifetime. The practicality of this rule
-    /// with doubt, hence temporarily deprecated.
-    ///
-    /// User must specify the item type in the rule in the form of `Iterator<X>`.
-    ///
-    /// Due to technical difficulties, this rule only supports marshaling an [Iterator] wrapped in a
-    /// [Box] or a [Result]. See `riko_runtime::iterators::IntoReturned` for explanation.
-    Iterator(String),
-
     /// Marshals custom types that support serialzation through [Serde](https://serde.rs).
     ///
     /// User must specify the marshaling rule in the form of `Serde<fully-qualified type path>`.
@@ -159,7 +144,6 @@ impl MarshalingRule {
             "I8" => Ok(Self::I8),
             "I32" => Ok(Self::I32),
             "I64" => Ok(Self::I64),
-            "Iterator" => Ok(Self::Iterator(String::default())),
             "Serde" => Ok(Self::Serde(Path {
                 leading_colon: None,
                 segments: Punctuated::new(),
@@ -176,7 +160,6 @@ impl MarshalingRule {
             Self::I8 => syn::parse_quote! { i8 },
             Self::I32 => syn::parse_quote! { i32 },
             Self::I64 => syn::parse_quote! { i64 },
-            Self::Iterator(_) => syn::parse_quote! { _ },
             Self::Serde(inner) => Type::Path(TypePath {
                 qself: None,
                 path: inner.clone(),
@@ -203,7 +186,6 @@ impl MarshalingRule {
             "std :: vec :: Vec < u8 >" | "Vec < u8 >" => Ok(Self::Bytes),
             _ => Ok(Self::Serde(type_path.clone())),
             // TODO: Result & Option
-            // TODO: Iterator
         }
     }
 }
@@ -212,18 +194,10 @@ impl Parse for MarshalingRule {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name: Ident = input.parse()?;
         let mut result = Self::from_name(&name)?;
-        match result {
-            Self::Serde(ref mut inner) => {
-                input.parse::<Token![<]>()?;
-                *inner = input.parse()?;
-                input.parse::<Token![>]>()?;
-            }
-            Self::Iterator(ref mut inner) => {
-                input.parse::<Token![<]>()?;
-                *inner = input.parse::<Ident>()?.to_string();
-                input.parse::<Token![>]>()?;
-            }
-            _ => (),
+        if let Self::Serde(ref mut inner) = result {
+            input.parse::<Token![<]>()?;
+            *inner = input.parse()?;
+            input.parse::<Token![>]>()?;
         }
         Ok(result)
     }
@@ -232,7 +206,6 @@ impl Parse for MarshalingRule {
 impl PartialEq for MarshalingRule {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Iterator(left), Self::Iterator(right)) => left == right,
             (Self::Serde(left), Self::Serde(right)) => {
                 left.to_token_stream().to_string() == right.to_token_stream().to_string()
             }
@@ -249,7 +222,6 @@ impl Debug for MarshalingRule {
             Self::I8 => write!(f, "I8"),
             Self::I32 => write!(f, "I32"),
             Self::I64 => write!(f, "I64"),
-            Self::Iterator(inner) => write!(f, "Iterator {{ {:?} }}", inner),
             Self::Serde(inner) => write!(f, "Serde {{ {} }}", inner.to_token_stream()),
             Self::String => write!(f, "String"),
         }

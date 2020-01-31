@@ -40,7 +40,6 @@ impl TargetCodeWriter for JniWriter {
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
         let return_type_result = match &function.output {
             None => "void".into(),
-            Some(MarshalingRule::Iterator(_)) => return_type(&MarshalingRule::I32),
             Some(inner) => return_type(inner),
         };
         let return_type_public = match &function.output {
@@ -202,7 +201,6 @@ fn return_type(rule: &MarshalingRule) -> String {
         MarshalingRule::I8 => "java.lang.Byte".into(),
         MarshalingRule::I32 => "java.lang.Integer".into(),
         MarshalingRule::I64 => "java.lang.Long".into(),
-        MarshalingRule::Iterator(inner) => format!("java.util.Iterator<{}>", inner),
         MarshalingRule::Serde(inner) => inner.to_token_stream().to_string().replace("::", "."),
         MarshalingRule::String => "java.lang.String".into(),
     }
