@@ -229,21 +229,6 @@ impl Debug for MarshalingRule {
     }
 }
 
-/// Arguments of `#[riko::marshal]`
-pub struct MarshalAttrArgs {
-    pub rule: MarshalingRule,
-}
-
-impl Parse for MarshalAttrArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
-        syn::parenthesized!(content in input);
-        Ok(Self {
-            rule: <MarshalingRule as Parse>::parse(&content)?,
-        })
-    }
-}
-
 fn assert_type_is_path(src: &Type) -> syn::Result<&Path> {
     if let Type::Path(type_path) = src {
         Ok(&type_path.path)

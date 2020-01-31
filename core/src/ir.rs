@@ -4,7 +4,6 @@
 //! contain the information sufficient for generating target code.
 
 use crate::parse::Fun;
-use crate::parse::MarshalAttrArgs;
 use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use quote::ToTokens;
@@ -16,6 +15,7 @@ use syn::ItemFn;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Meta;
+use syn::MetaNameValue;
 use syn::Type;
 
 fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
@@ -243,7 +243,18 @@ impl Input {
                         .iter()
                         .find(|attr| attr.path.to_token_stream().to_string() == "riko :: marshal");
                     let rule = if let Some(attr) = marshal_attr {
-                        syn::parse2::<MarshalAttrArgs>(attr.tokens.clone())?.rule
+                        if let Meta::NameValue(MetaNameValue {
+                            lit: Lit::Str(value),
+                            ..
+                        }) = attr.parse_meta()?
+                        {
+                            value.parse()?
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                attr,
+                                "Invalid `#[riko::marshal]` arguments",
+                            ));
+                        }
                     } else {
                         MarshalingRule::infer(&inner.ty)?
                     };
@@ -270,7 +281,7 @@ mod test {
             #[riko::fun(marshal = "String", name = "function2")]
             fn function(
                 a: &String,
-                #[riko::marshal(String)] b: Option<String>,
+                #[riko::marshal = "String"] b: Option<String>,
             ) -> Result<Option<String>> {
                 unimplemented!()
             }
@@ -300,7 +311,7 @@ mod test {
         let function: ItemFn = syn::parse_quote! {
             pub fn function(
                 a: &String,
-                #[riko::marshal(String)] b: Option<String>,
+                #[riko::marshal = "String"] b: Option<String>,
             ) {
                 unimplemented!()
             }

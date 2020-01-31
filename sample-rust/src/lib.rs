@@ -19,8 +19,8 @@ fn rename_ffi() {}
 
 #[riko::fun(marshal = "I32")]
 fn result_option(
-    #[riko::marshal(I32)] a: Option<i32>,
-    #[riko::marshal(I32)] b: Option<i32>,
+    #[riko::marshal = "I32"] a: Option<i32>,
+    #[riko::marshal = "I32"] b: Option<i32>,
 ) -> Result<Option<i32>, std::fmt::Error> {
     match (a, b) {
         (Some(a_value), Some(b_value)) => Ok(Some(a_value + b_value)),
