@@ -5,9 +5,7 @@ mod heaped;
 //mod serde;
 
 #[riko::fun]
-fn nothing() {
-    println!("A no-in no-out function.");
-}
+fn nothing() {}
 
 #[riko::fun]
 fn _i32(a: i32, b: i32) -> i32 {
@@ -15,9 +13,7 @@ fn _i32(a: i32, b: i32) -> i32 {
 }
 
 #[riko::fun(name = "rename")]
-fn rename_ffi() {
-    println!("A function to be renamed.");
-}
+fn rename_ffi() {}
 
 #[riko::fun(marshal = "I32")]
 fn result_option(
