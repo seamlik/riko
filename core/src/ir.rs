@@ -4,15 +4,17 @@
 //! contain the information sufficient for generating target code.
 
 use crate::parse::Fun;
+use crate::parse::MarshalAttrArgs;
 use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use quote::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
+use syn::FnArg;
 use syn::Item;
 use syn::ItemFn;
 use syn::ItemMod;
-use syn::ReturnType;
+use syn::Type;
 
 fn resolve_module_path(file_path_parent: &Path, module_name_child: &str) -> PathBuf {
     let mut result = file_path_parent.with_file_name(format!("{}.rs", module_name_child));
@@ -28,7 +30,6 @@ fn resolve_module_path(file_path_parent: &Path, module_name_child: &str) -> Path
 /// This is the root of a tree of IR.
 #[derive(Debug, PartialEq)]
 pub struct Crate {
-    pub bridges: Vec<Bridge>,
     pub modules: Vec<Module>,
     pub name: String,
 }
@@ -44,11 +45,9 @@ impl Crate {
             file: src.to_owned(),
             source: ErrorSource::Parse(err),
         })?;
-        let (modules, bridges) = Module::parse_items(&file.items, &[], src)?;
         Ok(Self {
-            modules,
+            modules: Module::parse_items(&file.items, &[], src)?,
             name,
-            bridges,
         })
     }
 }
@@ -77,9 +76,8 @@ impl Module {
         items: &[Item],
         module_path: &[String],
         file_path: &Path,
-    ) -> Result<(Vec<Self>, Vec<Bridge>), crate::Error> {
+    ) -> Result<Vec<Self>, crate::Error> {
         let mut result = Vec::<Self>::new();
-        let mut bridges = Vec::<Bridge>::new();
         let mut functions = Vec::<Function>::new();
 
         for item in items.iter() {
@@ -90,18 +88,15 @@ impl Module {
                         .iter()
                         .any(|x| x.path.to_token_stream().to_string() == "riko :: fun")
                     {
-                        let (f, b) = Function::parse(inner).map_err(|err| crate::Error {
+                        let f = Function::parse(inner).map_err(|err| crate::Error {
                             file: file_path.to_owned(),
                             source: ErrorSource::Riko(err),
                         })?;
                         functions.push(f);
-                        bridges.push(b);
                     }
                 }
                 Item::Mod(inner) => {
-                    let (m, b) = Self::parse_module(inner, module_path, file_path)?;
-                    result.extend(m);
-                    bridges.extend(b);
+                    result.extend(Self::parse_module(inner, module_path, file_path)?);
                 }
                 _ => {}
             }
@@ -110,7 +105,7 @@ impl Module {
             functions,
             path: module_path.into(),
         });
-        Ok((result, bridges))
+        Ok(result)
     }
 
     /// Parses a Rust module into a set of [Module]s.
@@ -129,7 +124,7 @@ impl Module {
         module: &ItemMod,
         module_path_parent: &[String],
         file_path_parent: &Path,
-    ) -> Result<(Vec<Self>, Vec<Bridge>), crate::Error> {
+    ) -> Result<Vec<Self>, crate::Error> {
         let module_name_child = module.ident.to_string();
 
         let mut module_path_child: Vec<String> = module_path_parent.into();
@@ -161,27 +156,24 @@ impl Module {
 /// Free-standing function.
 #[derive(Debug, PartialEq)]
 pub struct Function {
-    /// Parameters.
-    pub inputs: Vec<MarshalingRule>,
-
-    /// Name of the Rust `extern` function that wraps the origianl one.
-    pub name_bridge: String,
-
-    /// Name of the function on the target side.
-    pub name_public: String,
-
-    /// Return type.
+    pub inputs: Vec<Input>,
+    pub name: String,
     pub output: Option<MarshalingRule>,
+
+    /// Public name exported to the target side.
+    pub pubname: String,
 }
 
 impl Function {
     /// Parses an [ItemFn]. The item must be marked by a `#[riko::fun]`.
-    fn parse(item: &ItemFn) -> syn::Result<(Self, Bridge)> {
+    fn parse(item: &ItemFn) -> syn::Result<Self> {
         let attr = item
             .attrs
             .iter()
             .find(|x| x.path.to_token_stream().to_string() == "riko :: fun")
             .unwrap();
+        let name = item.sig.ident.to_string();
+
         let mut args: Fun = if attr.tokens.is_empty() {
             Default::default()
         } else {
@@ -189,39 +181,53 @@ impl Function {
         };
         args.expand_all_fields(&item.sig)?;
 
-        let mut item_stripped = item.clone(); // TODO: Don't clone
-        let inputs = MarshalingRule::parse(item_stripped.sig.inputs.iter_mut())?;
-
-        let name_bridge = crate::parse::mangle_function_name(item);
-
-        let bridge = Bridge {
-            input: item.sig.inputs.len(),
-            name: name_bridge.clone(),
-            output: std::mem::discriminant(&ReturnType::Default)
-                != std::mem::discriminant(&item.sig.output),
-        };
-        let result = Self {
-            inputs,
-            name_bridge,
-            name_public: args.name,
+        Ok(Self {
+            inputs: Input::parse(item.sig.inputs.iter())?,
+            pubname: if args.name.is_empty() {
+                name.clone()
+            } else {
+                args.name
+            },
+            name,
             output: args.marshal,
-        };
-
-        Ok((result, bridge))
+        })
     }
 }
 
-/// Function that bridges the code from both sides of FFI.
-///
-/// For every functions to be exported on the Rust side, there must be a function exposing a C API
-/// so that the code on the target side can call. This special function is called a "bridge".
-///
-/// Bridges are not specified by the user but generated by Riko.
+/// Function parameter.
 #[derive(Debug, PartialEq)]
-pub struct Bridge {
-    pub input: usize,
-    pub name: String,
-    pub output: bool,
+pub struct Input {
+    pub rule: MarshalingRule,
+    /// If the parameter accepts a reference.
+    pub borrow: bool,
+}
+
+impl Input {
+    pub fn parse<'a>(params: impl Iterator<Item = &'a FnArg>) -> syn::Result<Vec<Self>> {
+        params
+            .map(|p| {
+                if let FnArg::Typed(ref inner) = p {
+                    let marshal_attr = inner
+                        .attrs
+                        .iter()
+                        .find(|attr| attr.path.to_token_stream().to_string() == "riko :: marshal");
+                    let rule = if let Some(attr) = marshal_attr {
+                        syn::parse2::<MarshalAttrArgs>(attr.tokens.clone())?.rule
+                    } else {
+                        MarshalingRule::infer(&inner.ty)?
+                    };
+                    let borrow = if let Type::Reference(_) = *inner.ty {
+                        true
+                    } else {
+                        false
+                    };
+                    Ok(Self { rule, borrow })
+                } else {
+                    todo!("`#[fun]` on a method not implemented");
+                }
+            })
+            .collect()
+    }
 }
 
 mod test {
@@ -238,20 +244,46 @@ mod test {
                 unimplemented!()
             }
         };
-        let name_bridge = crate::parse::mangle_function_name(&function);
 
-        let expected_function = Function {
-            inputs: vec![MarshalingRule::String, MarshalingRule::String],
-            name_bridge: name_bridge.clone(),
-            name_public: "function2".into(),
+        let expected = Function {
+            name: "function".into(),
+            inputs: vec![
+                Input {
+                    rule: MarshalingRule::String,
+                    borrow: true,
+                },
+                Input {
+                    rule: MarshalingRule::String,
+                    borrow: false,
+                },
+            ],
             output: Some(MarshalingRule::String),
-        };
-        let expected_bridge = Bridge {
-            name: name_bridge,
-            input: 2,
-            output: true,
+            pubname: "function2".into(),
         };
         let actual = Function::parse(&mut function).unwrap();
-        assert_eq!(&(expected_function, expected_bridge), &actual);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn input() {
+        let function: ItemFn = syn::parse_quote! {
+            pub fn function(
+                a: &String,
+                #[riko::marshal(String)] b: Option<String>,
+            ) {
+                unimplemented!()
+            }
+        };
+        let actual = vec![
+            Input {
+                rule: MarshalingRule::String,
+                borrow: true,
+            },
+            Input {
+                rule: MarshalingRule::String,
+                borrow: false,
+            },
+        ];
+        assert_eq!(Input::parse(function.sig.inputs.iter()).unwrap(), actual)
     }
 }

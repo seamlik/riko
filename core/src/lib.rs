@@ -1,7 +1,5 @@
 //! Core components of Riko
 
-#![feature(drain_filter)]
-
 pub mod ir;
 pub mod jni;
 pub mod parse;
@@ -9,7 +7,9 @@ pub mod parse;
 use ir::Crate;
 use ir::Function;
 use ir::Module;
+use quote::ToTokens;
 use regex::Regex;
+use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -17,45 +17,105 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
+use syn::ItemFn;
 use thiserror::Error;
 
 /// Target code generation.
 pub trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
-    fn write_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error>;
+    fn write_target_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error>;
 
-    /// Generates target code for a function.
-    fn write_function(&self, function: &Function, module: &Module, root: &Crate) -> String;
+    /// Generates all code.
+    fn write_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error> {
+        self.write_target_all(ir, output_directory)?;
 
-    /// Generates target code for a module.
-    fn write_module(&self, module: &Module, root: &Crate) -> String;
-
-    fn write_target_file(&self, path: &Path, content: &str) -> std::io::Result<()> {
-        log::info!("Writing to `{}`", path.display());
-
-        std::fs::create_dir_all(path.parent().unwrap())?;
-
-        let mut file = File::create(path)?;
-        file.write_all(content.as_bytes())?;
-
+        let mut bridge_path = output_directory.to_owned();
+        bridge_path.push("bridge.rs");
+        let mut bridge_file = open_file(&bridge_path).map_err(|err| Error {
+            file: bridge_path.to_owned(),
+            source: ErrorSource::Write(err),
+        })?;
+        for module in ir.modules.iter() {
+            for function in module.functions.iter() {
+                let bridge = self
+                    .write_bridge_function(function, module, ir)
+                    .into_token_stream()
+                    .to_string();
+                bridge_file
+                    .write_all(bridge.as_bytes())
+                    .map_err(|err| Error {
+                        file: bridge_path.to_owned(),
+                        source: ErrorSource::Write(err),
+                    })?;
+            }
+        }
         Ok(())
     }
 
-    fn write_bridges(&self, root: &Crate) -> String;
+    /// Generates Rust bridge code for a function.
+    fn write_bridge_function(&self, function: &Function, module: &Module, root: &Crate) -> ItemFn;
+
+    /// Generates target code for a function.
+    fn write_target_function(&self, function: &Function, module: &Module, root: &Crate) -> String;
+
+    /// Generates target code for a module.
+    fn write_target_module(&self, module: &Module, root: &Crate) -> String;
+}
+
+/// Creates a source file on the filesystem, overwrites any existing content, handles logging.
+///
+/// Used by [TargetCodeWriter] implementations.
+fn open_file(path: &Path) -> std::io::Result<File> {
+    log::info!("Writing to `{}`", path.display());
+    std::fs::create_dir_all(path.parent().unwrap())?;
+    File::create(path)
+}
+
+/// Writes a source file.
+///
+/// The file will be created first, and all existing content will be erased.
+fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
+    log::info!("Writing to `{}`", path.display());
+
+    std::fs::create_dir_all(path.parent().unwrap())?;
+
+    let mut file = File::create(path)?;
+    file.write_all(content.as_bytes())?;
+
+    Ok(())
+}
+
+/// Generates language bindings and writes to an output directory.
+///
+/// Entry point of the crate.
+pub fn bindgen<'a>(
+    ir: &Crate,
+    output_directory: &Path,
+    targets: impl Iterator<Item = &'a String>,
+) -> Result<(), Error> {
+    for (target, writer) in create_target_code_writers(targets).into_iter() {
+        let mut target_output_directory = output_directory.to_owned();
+        target_output_directory.push(target);
+
+        writer.write_all(&ir, &target_output_directory)?;
+    }
+    Ok(())
 }
 
 /// This is where [TargetCodeWriter] implementations are registered.
-pub fn create_target_code_writers<'a>(
+fn create_target_code_writers<'a>(
     targets: impl Iterator<Item = &'a String>,
-) -> Vec<Box<dyn TargetCodeWriter>> {
-    let mut writers = Vec::<Box<dyn TargetCodeWriter>>::new();
+) -> BTreeMap<String, Box<dyn TargetCodeWriter>> {
+    let mut map = BTreeMap::<String, Box<dyn TargetCodeWriter>>::new();
     for target in targets {
         match target.as_str() {
-            "jni" => writers.push(Box::new(jni::JniWriter)),
+            "jni" => {
+                map.insert(target.into(), Box::new(jni::JniWriter));
+            }
             _ => log::warn!("Unsupported target `{}`", target),
         }
     }
-    writers
+    map
 }
 
 /// Errors when parsing Rust code or writing target code.

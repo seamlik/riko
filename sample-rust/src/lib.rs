@@ -1,3 +1,6 @@
+#[path = "../../target/riko/jni/bridge.rs"]
+mod bridge;
+
 mod heaped;
 //mod iterator;
 //mod serde;

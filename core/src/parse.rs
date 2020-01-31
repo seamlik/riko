@@ -1,9 +1,5 @@
 //! Syntax tree parsing.
 
-use blake2::digest::Input;
-use blake2::digest::VariableOutput;
-use blake2::VarBlake2b;
-use data_encoding::HEXLOWER;
 use quote::ToTokens;
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -12,9 +8,7 @@ use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::AttributeArgs;
-use syn::FnArg;
 use syn::Ident;
-use syn::ItemFn;
 use syn::Lit;
 use syn::LitStr;
 use syn::Meta;
@@ -25,19 +19,6 @@ use syn::Signature;
 use syn::Token;
 use syn::Type;
 use syn::TypePath;
-
-/// Generates a mangled function name to be invoked by target code.
-pub fn mangle_function_name(function: &ItemFn) -> String {
-    let mut function_without_attr = function.clone();
-    function_without_attr.attrs.clear();
-
-    let body = function_without_attr.into_token_stream().to_string();
-    let mut body_hasher = VarBlake2b::new(16).unwrap();
-    body_hasher.input(body.as_bytes());
-    let body_hash = HEXLOWER.encode(&body_hasher.vec_result());
-
-    format!("{}_{}", function.sig.ident.to_string(), body_hash)
-}
 
 /// Attributes for `#[fun]`.
 #[derive(Default, Debug, PartialEq)]
@@ -54,9 +35,6 @@ pub struct Fun {
 impl Fun {
     /// Fills in all optional fields by consulting a function signature.
     pub fn expand_all_fields(&mut self, sig: &Signature) -> syn::Result<()> {
-        if self.name.is_empty() {
-            self.name = sig.ident.to_string();
-        }
         if let ReturnType::Type(_, ty) = &sig.output {
             if self.marshal == None {
                 self.marshal = Some(MarshalingRule::infer(ty)?);
@@ -207,7 +185,7 @@ impl MarshalingRule {
         }
     }
 
-    fn infer(t: &Type) -> syn::Result<Self> {
+    pub fn infer(t: &Type) -> syn::Result<Self> {
         // TODO: Smarter inference with a table
 
         let type_path = match t {
@@ -227,32 +205,6 @@ impl MarshalingRule {
             // TODO: Result & Option
             // TODO: Iterator
         }
-    }
-
-    /// Generates a list of [MarshalingRule]s based on the helper attributes `#[riko::marshal]`
-    /// applied on `params` and removes those attributes during the process.
-    ///
-    /// Only processes the first matching attribute.
-    pub fn parse<'a>(params: impl Iterator<Item = &'a mut FnArg>) -> syn::Result<Vec<Self>> {
-        let mut result = Vec::<Self>::new();
-        for it in params {
-            if let FnArg::Typed(ref mut inner) = it {
-                let marshal_attr = inner
-                    .attrs
-                    .drain_filter(|attr| {
-                        attr.path.to_token_stream().to_string() == "riko :: marshal"
-                    })
-                    .next();
-                if let Some(attr) = marshal_attr {
-                    result.push(syn::parse2::<MarshalAttrArgs>(attr.tokens)?.rule);
-                } else {
-                    result.push(MarshalingRule::infer(&inner.ty)?);
-                }
-            } else {
-                todo!("`#[fun]` on a method not implemented");
-            }
-        }
-        Ok(result)
     }
 }
 
@@ -304,8 +256,9 @@ impl Debug for MarshalingRule {
     }
 }
 
-struct MarshalAttrArgs {
-    rule: MarshalingRule,
+/// Arguments of `#[riko::marshal]`
+pub struct MarshalAttrArgs {
+    pub rule: MarshalingRule,
 }
 
 impl Parse for MarshalAttrArgs {
@@ -403,31 +356,5 @@ mod tests {
             MarshalingRule::infer(&syn::parse_quote! { org::example::Love }).unwrap(),
             MarshalingRule::Serde(syn::parse_quote! { org::example::Love })
         );
-    }
-
-    #[test]
-    fn MarshalingRule_parse_params() {
-        let mut actual_params: Punctuated<FnArg, Token![,]> = vec![
-            syn::parse_str::<FnArg>("a: String").unwrap(),
-            syn::parse_quote! { #[riko::marshal(String)] b: Option<String> },
-        ]
-        .into_iter()
-        .collect();
-
-        let expected_params: Punctuated<FnArg, Token![,]> = vec![
-            syn::parse_str::<FnArg>("a: String").unwrap(),
-            syn::parse_quote! { b: Option<String> },
-        ]
-        .into_iter()
-        .collect();
-
-        let actual_rules = MarshalingRule::parse(actual_params.iter_mut()).unwrap();
-        let expected_rules = [MarshalingRule::String, MarshalingRule::String];
-
-        assert_eq!(
-            actual_params.to_token_stream().to_string(),
-            expected_params.to_token_stream().to_string()
-        );
-        assert_eq!(actual_rules, expected_rules);
     }
 }

@@ -17,14 +17,11 @@ pub fn main() -> anyhow::Result<()> {
             );
             continue;
         }
-        for writer in riko_core::create_target_code_writers(config.targets.iter()).into_iter() {
-            let ir = Crate::parse(&config.cached.entry, config.cached.crate_name.clone())?;
-
-            let mut output_directory = config.cached.output_directory.clone();
-            output_directory.push("jni");
-
-            writer.write_all(&ir, &output_directory)?;
-        }
+        riko_core::bindgen(
+            &Crate::parse(&config.cached.entry, config.cached.crate_name.clone())?,
+            &config.cached.output_directory,
+            config.targets.iter(),
+        )?;
     }
     Ok(())
 }

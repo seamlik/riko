@@ -4,14 +4,14 @@
 //!
 //! In order to enable code generation, at least 1 target must be specified in the package metadata.
 
+#![feature(drain_filter)]
+
 extern crate proc_macro;
 
-mod jni;
+mod expand;
 
-use jni::JniExpander;
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use riko_core::parse::Fun;
 use syn::ItemFn;
 use syn::ItemStruct;
 
@@ -31,18 +31,12 @@ pub fn marshal(_: TokenStream, _: TokenStream) -> TokenStream {
 /// This attribute only applies on a
 /// [free-standing function](https://doc.rust-lang.org/reference/items/functions.html).
 ///
-/// See [Fun] for details on the attributes.
+/// See [Fun](riko_core::parse::Fun) for details on the attributes.
 #[proc_macro_attribute]
-pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn fun(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut subject = syn::parse_macro_input!(item as ItemFn);
-    let mut args: Fun = syn::parse_macro_input!(attr as Fun);
-    if let Err(err) = args.expand_all_fields(&subject.sig) {
-        return err.to_compile_error().into();
-    }
-
-    let mut result: TokenStream = JniExpander.fun(&mut subject, &args).into();
-    result.extend::<TokenStream>(subject.into_token_stream().into());
-    result
+    expand::remove_marshal_attrs(&mut subject);
+    subject.into_token_stream().into()
 }
 
 /// Generates language bindings for a Rust type allocated on the heap.
@@ -52,19 +46,6 @@ pub fn fun(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// trait.
 #[proc_macro_derive(Heaped)]
 pub fn derive_heap(item: TokenStream) -> TokenStream {
-    let item_struct = syn::parse_macro_input!(item as ItemStruct);
-    JniExpander.heaped(&item_struct).into()
-}
-
-/// Language binding generator.
-///
-/// All macro arguments must be fully expanded.
-trait MacroExpander {
-    /// Generates Rust code wrapping a `Heaped`.
-    fn heaped(&self, item: &ItemStruct) -> proc_macro2::TokenStream;
-
-    /// Generates Rust code wrapping a function.
-    ///
-    /// After expansion, all `#[riko::marshal]` attributes must be removed from `item`.
-    fn fun(&self, item: &mut ItemFn, args: &Fun) -> proc_macro2::TokenStream;
+    let item = syn::parse_macro_input!(item as ItemStruct);
+    expand::heaped(&item).into()
 }

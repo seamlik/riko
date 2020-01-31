@@ -8,8 +8,6 @@ repository = "https://github.com/seamlik/riko"
 version = "0.0.1"
 
 [dependencies]
-blake2 = "0"
-data-encoding = "2"
 itertools = "0"
 log = "0"
 proc-macro2 = "1"
