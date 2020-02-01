@@ -91,7 +91,7 @@ impl Parse for Fun {
 /// information, it is impossible to always acurrately infer the rule. If the inference causes
 /// compiler errors or a type alias is used, specify the rule explicitly.
 ///
-/// If no other rules match the inference, `Serde` will be chosen by default.
+/// If no other rules match the inference, `Struct` will be chosen by default.
 ///
 /// # Errors and Nullness
 ///
@@ -128,10 +128,10 @@ pub enum MarshalingRule {
 
     /// Marshals custom types that support serialzation through [Serde](https://serde.rs).
     ///
-    /// User must specify the marshaling rule in the form of `Serde<fully-qualified type path>`.
+    /// User must specify the marshaling rule in the form of `Struct<fully-qualified type path>`.
     /// Alternatively, one may obmit the rule and use the fully-qualified type path in the function
     /// signature.
-    Serde(Path),
+    Struct(Path),
 
     /// Marshals a [String].
     String,
@@ -145,7 +145,7 @@ impl MarshalingRule {
             "I8" => Ok(Self::I8),
             "I32" => Ok(Self::I32),
             "I64" => Ok(Self::I64),
-            "Serde" => Ok(Self::Serde(Path {
+            "Struct" => Ok(Self::Struct(Path {
                 leading_colon: None,
                 segments: Punctuated::new(),
             })),
@@ -161,7 +161,7 @@ impl MarshalingRule {
             Self::I8 => syn::parse_quote! { i8 },
             Self::I32 => syn::parse_quote! { i32 },
             Self::I64 => syn::parse_quote! { i64 },
-            Self::Serde(inner) => Type::Path(TypePath {
+            Self::Struct(inner) => Type::Path(TypePath {
                 qself: None,
                 path: inner.clone(),
             }),
@@ -185,7 +185,7 @@ impl MarshalingRule {
             "i8" => Ok(Self::I8),
             "std :: string :: String" | "String" => Ok(Self::String),
             "serde_bytes :: ByteBuf" | "ByteBuf" => Ok(Self::Bytes),
-            _ => Ok(Self::Serde(type_path.clone())),
+            _ => Ok(Self::Struct(type_path.clone())),
             // TODO: Result & Option
         }
     }
@@ -195,7 +195,7 @@ impl Parse for MarshalingRule {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name: Ident = input.parse()?;
         let mut result = Self::from_name(&name)?;
-        if let Self::Serde(ref mut inner) = result {
+        if let Self::Struct(ref mut inner) = result {
             input.parse::<Token![<]>()?;
             *inner = input.parse()?;
             input.parse::<Token![>]>()?;
@@ -207,7 +207,7 @@ impl Parse for MarshalingRule {
 impl PartialEq for MarshalingRule {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Serde(left), Self::Serde(right)) => {
+            (Self::Struct(left), Self::Struct(right)) => {
                 left.to_token_stream().to_string() == right.to_token_stream().to_string()
             }
             _ => std::mem::discriminant(self) == std::mem::discriminant(other),
@@ -223,7 +223,7 @@ impl Debug for MarshalingRule {
             Self::I8 => write!(f, "I8"),
             Self::I32 => write!(f, "I32"),
             Self::I64 => write!(f, "I64"),
-            Self::Serde(inner) => write!(f, "Serde {{ {} }}", inner.to_token_stream()),
+            Self::Struct(inner) => write!(f, "Struct {{ {} }}", inner.to_token_stream()),
             Self::String => write!(f, "String"),
         }
     }
@@ -267,15 +267,15 @@ mod tests {
         assert_eq!(
             format!(
                 "{:?}",
-                syn::parse_str::<MarshalingRule>("Serde<org::example::Love>").unwrap()
+                syn::parse_str::<MarshalingRule>("Struct<org::example::Love>").unwrap()
             ),
-            "Serde { org :: example :: Love }"
+            "Struct { org :: example :: Love }"
         );
         assert_eq!(
             format!("{:?}", syn::parse_str::<MarshalingRule>("String").unwrap()),
             "String"
         );
-        syn::parse_str::<MarshalingRule>("Serde").unwrap_err();
+        syn::parse_str::<MarshalingRule>("Struct").unwrap_err();
     }
 
     #[test]
@@ -312,7 +312,7 @@ mod tests {
         );
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { org::example::Love }).unwrap(),
-            MarshalingRule::Serde(syn::parse_quote! { org::example::Love })
+            MarshalingRule::Struct(syn::parse_quote! { org::example::Love })
         );
     }
 }

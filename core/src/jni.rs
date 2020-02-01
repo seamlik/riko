@@ -201,7 +201,7 @@ fn return_type(rule: &MarshalingRule) -> String {
         MarshalingRule::I8 => "java.lang.Byte".into(),
         MarshalingRule::I32 => "java.lang.Integer".into(),
         MarshalingRule::I64 => "java.lang.Long".into(),
-        MarshalingRule::Serde(inner) => inner.to_token_stream().to_string().replace("::", "."),
+        MarshalingRule::Struct(inner) => inner.to_token_stream().to_string().replace("::", "."),
         MarshalingRule::String => "java.lang.String".into(),
     }
 }

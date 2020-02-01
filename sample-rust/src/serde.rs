@@ -23,10 +23,10 @@ fn serde_inferred(love: crate::serde::Love, work: crate::serde::Work) -> crate::
     }
 }
 
-#[riko::fun(marshal = "Serde<crate::serde::Life>")]
+#[riko::fun(marshal = "Struct<crate::serde::Life>")]
 fn serde_explicit(
-    #[riko::marshal(Serde<crate::serde::Love>)] love: Love,
-    #[riko::marshal(Serde<crate::serde::Work>)] work: Work,
+    #[riko::marshal(Struct<crate::serde::Love>)] love: Love,
+    #[riko::marshal(Struct<crate::serde::Work>)] work: Work,
 ) -> crate::serde::Life {
     Life {
         happy: !love.target.is_empty() && work.salary > 0,
