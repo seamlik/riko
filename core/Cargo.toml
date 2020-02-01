@@ -10,7 +10,7 @@ version = "0.0.1"
 [dependencies]
 itertools = "0"
 log = "0"
-proc-macro2 = "1"
+proc-macro2 = { version = "1", features = ["span-locations"]}
 quote = "1"
 regex = { version = "1", features = ["pattern"] }
 syn = { version = "1", features = ["full"] }
