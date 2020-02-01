@@ -151,10 +151,8 @@ impl Module {
         module_path_parent: &[String],
         file_path_parent: &Path,
     ) -> Result<Vec<Self>, crate::Error> {
-        let module_name_child = module.ident.to_string();
-
         let mut module_path_child: Vec<String> = module_path_parent.into();
-        module_path_child.push(module_name_child.clone());
+        module_path_child.push(module.ident.to_string());
 
         let file_path_child =
             resolve_module_path(file_path_parent.to_owned(), module).map_err(|err| {
