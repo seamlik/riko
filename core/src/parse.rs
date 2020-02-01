@@ -170,23 +170,50 @@ impl MarshalingRule {
     }
 
     pub fn infer(t: &Type) -> syn::Result<Self> {
-        // TODO: Smarter inference with a table
+        enum Candidate {
+            Primitive(&'static str),
+            /// To match the leading colons in `::std::string::String`, put an empty string at the
+            /// first location.
+            Struct(&'static [&'static str]),
+        }
+        impl Candidate {
+            fn matches(&self, raw: &str) -> bool {
+                let matches = |candidate: &str| {
+                    raw == candidate
+                        || raw == format!("Option < {} >", candidate)
+                        || raw == format!("Result < Option < {} > >", candidate)
+                };
+                match self {
+                    Self::Primitive(name) => matches(name),
+                    Self::Struct(path) => {
+                        matches(path.last().unwrap())
+                            || matches(&path[1..].join(" :: "))
+                            || matches(&path.join(" :: ").trim())
+                    }
+                }
+            }
+        }
 
         let type_path = match t {
             Type::Reference(reference) => assert_type_is_path(&reference.elem),
             _ => assert_type_is_path(t),
         }?;
-        let type_path_no_leading_colons = type_path.segments.to_token_stream().to_string();
+        let type_path_str = type_path.segments.to_token_stream().to_string();
 
-        match type_path_no_leading_colons.as_str() {
-            "bool" => Ok(Self::Bool),
-            "i32" => Ok(Self::I32),
-            "i64" => Ok(Self::I64),
-            "i8" => Ok(Self::I8),
-            "std :: string :: String" | "String" => Ok(Self::String),
-            "serde_bytes :: ByteBuf" | "ByteBuf" => Ok(Self::Bytes),
-            _ => Ok(Self::Struct(type_path.clone())),
-            // TODO: Result & Option
+        if Candidate::Primitive("bool").matches(&type_path_str) {
+            Ok(Self::Bool)
+        } else if Candidate::Primitive("i32").matches(&type_path_str) {
+            Ok(Self::I32)
+        } else if Candidate::Primitive("i64").matches(&type_path_str) {
+            Ok(Self::I64)
+        } else if Candidate::Primitive("i8").matches(&type_path_str) {
+            Ok(Self::I8)
+        } else if Candidate::Struct(&["", "std", "string", "String"]).matches(&type_path_str) {
+            Ok(Self::String)
+        } else if Candidate::Struct(&["", "serde_bytes", "ByteBuf"]).matches(&type_path_str) {
+            Ok(Self::Bytes)
+        } else {
+            Ok(Self::Struct(type_path.clone()))
         }
     }
 }
@@ -285,11 +312,37 @@ mod tests {
             MarshalingRule::Bytes
         );
         assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Option<ByteBuf> }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<ByteBuf>> }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { serde_bytes::ByteBuf }).unwrap(),
             MarshalingRule::Bytes
         );
         assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Option<serde_bytes::ByteBuf> }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<serde_bytes::ByteBuf>> })
+                .unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { ::serde_bytes::ByteBuf }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Option<::serde_bytes::ByteBuf> }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<::serde_bytes::ByteBuf>> })
+                .unwrap(),
             MarshalingRule::Bytes
         );
 
@@ -308,6 +361,14 @@ mod tests {
 
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { bool }).unwrap(),
+            MarshalingRule::Bool
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Option<bool> }).unwrap(),
+            MarshalingRule::Bool
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<bool>> }).unwrap(),
             MarshalingRule::Bool
         );
         assert_eq!(
