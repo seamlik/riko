@@ -53,7 +53,7 @@ fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn
 
 /// Crate.
 ///
-/// This is the root of a tree of IR.
+/// This is the root of an IR tree.
 #[derive(Debug, PartialEq)]
 pub struct Crate {
     pub modules: Vec<Module>,

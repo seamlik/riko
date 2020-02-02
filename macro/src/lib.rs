@@ -1,8 +1,4 @@
-//! Sub-optimal language binding generator.
-//!
-//! # Config
-//!
-//! In order to enable code generation, at least 1 target must be specified in the package metadata.
+//! Marker attributes of [Riko](https://github.com/seamlik/riko)
 
 #![feature(drain_filter)]
 
@@ -21,6 +17,9 @@ use syn::ItemStruct;
 ///
 /// This is a helper attribute for [fun]. In order to avoid name collision, the fully-qualified
 /// attribute name (`#[riko::marshal]`) must be used.
+///
+/// # See
+/// * [MarshalingRule](riko_core::parse::MarshalingRule)
 #[proc_macro_attribute]
 pub fn marshal(_: TokenStream, _: TokenStream) -> TokenStream {
     unimplemented!("Must not be used on its own")
@@ -31,7 +30,9 @@ pub fn marshal(_: TokenStream, _: TokenStream) -> TokenStream {
 /// This attribute only applies on a
 /// [free-standing function](https://doc.rust-lang.org/reference/items/functions.html).
 ///
-/// See [Fun](riko_core::parse::Fun) for details on the attributes.
+/// # See
+///
+/// * [Fun](riko_core::parse::Fun)
 #[proc_macro_attribute]
 pub fn fun(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut subject = syn::parse_macro_input!(item as ItemFn);

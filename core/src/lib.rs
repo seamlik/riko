@@ -1,4 +1,6 @@
 //! Core components of Riko
+//!
+//! [bindgen] is the entry point.
 
 pub mod ir;
 pub mod jni;
@@ -86,8 +88,6 @@ fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
 }
 
 /// Generates language bindings and writes to an output directory.
-///
-/// Entry point of the crate.
 pub fn bindgen<'a>(
     ir: &Crate,
     output_directory: &Path,
@@ -121,6 +121,7 @@ fn create_target_code_writers<'a>(
 /// Errors when parsing Rust code or writing target code.
 #[derive(Error, Debug)]
 pub struct Error {
+    /// The Rust source file which causes the error.
     pub file: PathBuf,
     pub source: ErrorSource,
 }

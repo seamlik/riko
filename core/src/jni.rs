@@ -138,7 +138,7 @@ impl TargetCodeWriter for JniWriter {
         // Block that calls the original function
         let result_block_invocation = match &function.output {
             Some(output) => {
-                let output_type = output.to_rust_return_type();
+                let output_type = output.rust_type();
                 quote! {
                     let result = #full_public_name(
                         #(#result_args),*

@@ -20,7 +20,9 @@ use syn::Token;
 use syn::Type;
 use syn::TypePath;
 
-/// Attributes for `#[fun]`.
+/// `#[riko::fun]`.
+///
+/// All parameters are optional.
 #[derive(Default, Debug, PartialEq)]
 pub struct Fun {
     /// Symbol name used when exporting the item, convenient for avoiding name clashes.
@@ -28,7 +30,7 @@ pub struct Fun {
 
     /// Marshaling rule for the return type.
     ///
-    /// To specify the rule for a parameter, use `#[riko::marshal]`.
+    /// To specify the rule for a parameter, use `#[riko::marshal]` on the parameter.
     pub marshal: Option<MarshalingRule>,
 }
 
@@ -83,28 +85,19 @@ impl Parse for Fun {
 /// because we only want to make sure they work with all target languages (Java does not have
 /// unsigned integers, for example).
 ///
-/// # Rule Inference
-///
-/// When no rule is specified, the macros will try to guess the rule.
-///
-/// Since procedural macros can only analyse a syntax tree and have no access to any type
-/// information, it is impossible to always acurrately infer the rule. If the inference causes
-/// compiler errors or a type alias is used, specify the rule explicitly.
-///
-/// If no other rules match the inference, `Struct` will be chosen by default.
-///
 /// # Errors and Nullness
 ///
 /// Unless specified, most of the rules work with their corresponding Rust types being wrapped
 /// inside an [Option]. In the return position, wrapping the type in a [Result]
 /// is also supported.
 ///
-/// # References and borrowed Types
+/// # References and Borrowed Types
 ///
-/// For function parameters, references are also supported. Unfortunately, the borrowed version of
-/// a specific type is not supported (e.g. `&str` instead of `&String`), as that will prevent us
-/// from benefiting from the compiler's type inference and will lose the support of
-/// [Result] and [Option], which is of higher priority.
+/// Because the data is copied between FFI boundary and thus is always owned, support for references
+/// and borrwoed types are limited.
+///
+/// References are supported For function parameters. However, the borrowed version of an owned type
+/// is not supported (e.g. `&String` works but `&str` doesn't).
 ///
 /// For returned types, only owned types are supported.
 pub enum MarshalingRule {
@@ -154,7 +147,8 @@ impl MarshalingRule {
         }
     }
 
-    pub fn to_rust_return_type(&self) -> Type {
+    /// The Rust type corresponding to the rule.
+    pub fn rust_type(&self) -> Type {
         match self {
             Self::Bool => syn::parse_quote! { bool },
             Self::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
@@ -169,6 +163,13 @@ impl MarshalingRule {
         }
     }
 
+    /// Infers the rule from the Rust source code when a rule is not specified.
+    ///
+    /// Since procedural macros can only analyse a syntax tree and have no access to any type
+    /// information, it is impossible to always acurrately infer the rule. If the inference causes
+    /// compiler errors or a type alias is used, specify the rule explicitly.
+    ///
+    /// If no other rules match the inference, `Struct` will be chosen by default.
     pub fn infer(t: &Type) -> syn::Result<Self> {
         enum Candidate {
             Primitive(&'static str),
