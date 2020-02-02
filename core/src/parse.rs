@@ -181,7 +181,8 @@ impl MarshalingRule {
                 let matches = |candidate: &str| {
                     raw == candidate
                         || raw == format!("Option < {} >", candidate)
-                        || raw == format!("Result < Option < {} > >", candidate)
+                        || raw.starts_with(&format!("Result < {} , ", candidate))
+                        || raw.starts_with(&format!("Result < Option < {} > , ", candidate))
                 };
                 match self {
                     Self::Primitive(name) => matches(name),
@@ -316,7 +317,12 @@ mod tests {
             MarshalingRule::Bytes
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { Result<Option<ByteBuf>> }).unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! { Result<ByteBuf, std::io::Error> }).unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<ByteBuf>, std::io::Error> })
+                .unwrap(),
             MarshalingRule::Bytes
         );
         assert_eq!(
@@ -328,8 +334,17 @@ mod tests {
             MarshalingRule::Bytes
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { Result<Option<serde_bytes::ByteBuf>> })
-                .unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! {
+                Result<serde_bytes::ByteBuf, std::io::Error>
+            })
+            .unwrap(),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! {
+                Result<Option<serde_bytes::ByteBuf>, std::io::Error>
+            })
+            .unwrap(),
             MarshalingRule::Bytes
         );
         assert_eq!(
@@ -341,8 +356,10 @@ mod tests {
             MarshalingRule::Bytes
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { Result<Option<::serde_bytes::ByteBuf>> })
-                .unwrap(),
+            MarshalingRule::infer(
+                &syn::parse_quote! { Result<Option<::serde_bytes::ByteBuf>, std::io::Error> }
+            )
+            .unwrap(),
             MarshalingRule::Bytes
         );
 
@@ -368,7 +385,12 @@ mod tests {
             MarshalingRule::Bool
         );
         assert_eq!(
-            MarshalingRule::infer(&syn::parse_quote! { Result<Option<bool>> }).unwrap(),
+            MarshalingRule::infer(&syn::parse_quote! { Result<bool, std::io::Error> }).unwrap(),
+            MarshalingRule::Bool
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<Option<bool>, std::io::Error> })
+                .unwrap(),
             MarshalingRule::Bool
         );
         assert_eq!(
