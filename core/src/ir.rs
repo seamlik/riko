@@ -196,13 +196,13 @@ pub struct Function {
 impl Function {
     /// Parses an [ItemFn]. The item must be marked by a `#[riko::fun]`.
     fn parse(item: &ItemFn) -> syn::Result<Self> {
+        let name = item.sig.ident.to_string();
+
         let attr = item
             .attrs
             .iter()
             .find(|x| x.path.to_token_stream().to_string() == "riko :: fun")
-            .unwrap();
-        let name = item.sig.ident.to_string();
-
+            .expect("Expect a `#[riko::fun]`");
         let mut args: Fun = if attr.tokens.is_empty() {
             Default::default()
         } else {
