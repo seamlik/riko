@@ -17,16 +17,19 @@ fn _i32(a: i32, b: i32) -> i32 {
 #[riko::fun(name = "rename")]
 fn rename_ffi() {}
 
-#[riko::fun(marshal = "I32")]
-fn result_option(
-    #[riko::marshal = "I32"] a: Option<i32>,
-    #[riko::marshal = "I32"] b: Option<i32>,
-) -> Result<Option<i32>, std::fmt::Error> {
+#[riko::fun]
+fn result_option(a: Option<i32>, b: Option<i32>) -> Result<Option<i32>, std::fmt::Error> {
     match (a, b) {
         (Some(a_value), Some(b_value)) => Ok(Some(a_value + b_value)),
         (None, None) => Err(std::fmt::Error),
         _ => Ok(None),
     }
+}
+
+type NewType = i32;
+#[riko::fun(marshal = "I32")]
+fn marshal(#[riko::marshal = "I32"] a: NewType) -> NewType {
+    -a
 }
 
 #[riko::fun]

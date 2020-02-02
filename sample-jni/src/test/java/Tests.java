@@ -35,6 +35,11 @@ class Tests {
   }
 
   @Test
+  void marshal() {
+    Assertions.assertEquals(-1, __riko_Module.marshal(1));
+  }
+
+  @Test
   void string() {
     Assertions.assertEquals("love you", __riko_Module.string("love", " you"));
   }
