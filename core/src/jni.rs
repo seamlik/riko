@@ -425,8 +425,8 @@ mod tests {
                 byte[] arg_1
             );
             public static java.lang.String function(
-                final java.lang.String arg_0,
-                final java.lang.String arg_1
+                final java.lang.Integer arg_0,
+                final java.lang.Long arg_1
             ) {
                 final byte[] returned = __riko_function(
                     riko.Marshaler.toBytes(arg_0),
@@ -444,11 +444,11 @@ mod tests {
                     pubname: "function".into(),
                     inputs: vec![
                         Input {
-                            rule: MarshalingRule::String,
+                            rule: MarshalingRule::I32,
                             borrow: true,
                         },
                         Input {
-                            rule: MarshalingRule::String,
+                            rule: MarshalingRule::I64,
                             borrow: false,
                         },
                     ],
@@ -476,11 +476,11 @@ mod tests {
                     pubname: "function".into(),
                     inputs: vec![
                         Input {
-                            rule: MarshalingRule::String,
+                            rule: MarshalingRule::I32,
                             borrow: true,
                         },
                         Input {
-                            rule: MarshalingRule::String,
+                            rule: MarshalingRule::I64,
                             borrow: false,
                         },
                     ],

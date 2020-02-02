@@ -276,11 +276,11 @@ mod test {
     #[test]
     fn function() {
         let mut function: syn::ItemFn = syn::parse_quote! {
-            #[riko::fun(marshal = "String", name = "function2")]
+            #[riko::fun(marshal = "I32", name = "function2")]
             fn function(
-                a: &String,
-                #[riko::marshal = "String"] b: Option<String>,
-            ) -> Result<Option<String>> {
+                a: bool,
+                #[riko::marshal = "Bytes"] b: &String,
+            ) -> Vec<u8> {
                 unimplemented!()
             }
         };
@@ -289,15 +289,15 @@ mod test {
             name: "function".into(),
             inputs: vec![
                 Input {
-                    rule: MarshalingRule::String,
-                    borrow: true,
-                },
-                Input {
-                    rule: MarshalingRule::String,
+                    rule: MarshalingRule::Bool,
                     borrow: false,
                 },
+                Input {
+                    rule: MarshalingRule::Bytes,
+                    borrow: true,
+                },
             ],
-            output: Some(MarshalingRule::String),
+            output: Some(MarshalingRule::I32),
             pubname: "function2".into(),
         };
         let actual = Function::parse(&mut function).unwrap();
@@ -308,8 +308,10 @@ mod test {
     fn input() {
         let function: ItemFn = syn::parse_quote! {
             pub fn function(
-                a: &String,
-                #[riko::marshal = "String"] b: Option<String>,
+                a: String,
+                #[riko::marshal = "String"] b: usize,
+                c: &ByteBuf,
+                #[riko::marshal = "I32"] d: &Vec<u8>,
             ) {
                 unimplemented!()
             }
@@ -317,11 +319,19 @@ mod test {
         let actual = vec![
             Input {
                 rule: MarshalingRule::String,
-                borrow: true,
+                borrow: false,
             },
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
+            },
+            Input {
+                rule: MarshalingRule::Bytes,
+                borrow: true,
+            },
+            Input {
+                rule: MarshalingRule::I32,
+                borrow: true,
             },
         ];
         assert_eq!(Input::parse(function.sig.inputs.iter()).unwrap(), actual)
