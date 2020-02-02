@@ -40,11 +40,11 @@ impl TargetCodeWriter for JniWriter {
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
         let return_type_result = match &function.output {
             None => "void".into(),
-            Some(inner) => return_type(inner),
+            Some(inner) => target_type(inner),
         };
         let return_type_public = match &function.output {
             None => "void".into(),
-            Some(inner) => return_type(inner),
+            Some(inner) => target_type(inner),
         };
         let return_prefix = if function.output.is_none() {
             ""
@@ -72,7 +72,7 @@ impl TargetCodeWriter for JniWriter {
             .inputs
             .iter()
             .enumerate()
-            .map(|(idx, _)| format!("final {} arg_{}", return_type_public, idx))
+            .map(|(idx, input)| format!("final {} arg_{}", target_type(&input.rule), idx))
             .join(", ");
         let return_type_bridge = if function.output.is_none() {
             "void"
@@ -194,7 +194,7 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn return_type(rule: &MarshalingRule) -> String {
+fn target_type(rule: &MarshalingRule) -> String {
     match rule {
         MarshalingRule::Bool => "java.lang.Boolean".into(),
         MarshalingRule::Bytes => "byte[]".into(),
