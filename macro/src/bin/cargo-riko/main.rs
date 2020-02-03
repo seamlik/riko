@@ -7,7 +7,7 @@ pub fn main() -> anyhow::Result<()> {
     env_logger::init();
     for config in Config::read_all_configs()?.iter() {
         if format!("{}", config.cached.entry.display()).is_empty() {
-            log::info!(
+            log::warn!(
                 "Package `{}` does not have a `cdylib` target, skipping.",
                 &config.cached.crate_name
             );
