@@ -52,10 +52,11 @@ impl Config {
         self.cached.output_directory = metadata.target_directory.clone();
         self.cached.output_directory.push("riko");
 
+        let cdylib = "cdylib".to_string();
         self.cached.entry = package
             .targets
             .iter()
-            .find(|t| t.kind == vec!["cdylib"])
+            .find(|t| t.kind.contains(&cdylib))
             .map(|t| t.src_path.clone())
             .unwrap_or_default();
     }
