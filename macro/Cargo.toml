@@ -13,6 +13,7 @@ proc-macro = true
 [dependencies]
 anyhow = "1"
 cargo_metadata = "0"
+env_logger = "0"
 itertools = "0"
 log = "0"
 proc-macro2 = { version = "1", features = ["span-locations"]}

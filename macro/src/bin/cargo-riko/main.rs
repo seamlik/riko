@@ -4,11 +4,7 @@ use config::Config;
 use riko_core::ir::Crate;
 
 pub fn main() -> anyhow::Result<()> {
-    if std::env::args().len() > 1 {
-        eprintln!("No arguments are allowed.");
-        std::process::exit(1);
-    }
-
+    env_logger::init();
     for config in Config::read_all_configs()?.iter() {
         if format!("{}", config.cached.entry.display()).is_empty() {
             log::info!(
