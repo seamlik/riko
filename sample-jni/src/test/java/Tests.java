@@ -1,7 +1,7 @@
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import riko_sample.__riko_Module;
+import riko_sample.Module;
 
 class Tests {
   static {
@@ -14,34 +14,34 @@ class Tests {
 
   @Test
   void nothing() {
-    __riko_Module.nothing();
+    Module.nothing();
   }
 
   @Test
   void i32() {
-    Assertions.assertEquals(2, __riko_Module._i32(1, 1));
+    Assertions.assertEquals(2, Module._i32(1, 1));
   }
 
   @Test
   void rename() {
-    __riko_Module.rename();
+    Module.rename();
   }
 
   @Test
   void result_option() {
-    Assertions.assertEquals(2, __riko_Module.result_option(1, 1));
-    Assertions.assertThrows(Exception.class, () -> __riko_Module.result_option(null, null));
-    Assertions.assertNull(__riko_Module.result_option(null, 1));
+    Assertions.assertEquals(2, Module.result_option(1, 1));
+    Assertions.assertThrows(Exception.class, () -> Module.result_option(null, null));
+    Assertions.assertNull(Module.result_option(null, 1));
   }
 
   @Test
   void marshal() {
-    Assertions.assertEquals(-1, __riko_Module.marshal(1));
+    Assertions.assertEquals(-1, Module.marshal(1));
   }
 
   @Test
   void string() {
-    Assertions.assertEquals("love you", __riko_Module.string("love", " you"));
+    Assertions.assertEquals("love you", Module.string("love", " you"));
   }
 
   @Test
@@ -49,11 +49,11 @@ class Tests {
     byte[] a = { 1, 2, 3 };
     byte[] b = { 4, 5, 6 };
     byte[] expected = { 1, 2, 3, 4, 5, 6 };
-    Assertions.assertArrayEquals(expected, __riko_Module.bytes(a, b));
+    Assertions.assertArrayEquals(expected, Module.bytes(a, b));
   }
 
   @Test
   void bool() {
-    Assertions.assertEquals(false, __riko_Module._bool(false, true));
+    Assertions.assertEquals(false, Module._bool(false, true));
   }
 }

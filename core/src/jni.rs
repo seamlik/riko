@@ -14,7 +14,8 @@ use std::path::Path;
 use syn::Ident;
 use syn::ItemFn;
 
-const CLASS_FOR_MODULE: &str = "__riko_Module";
+const CLASS_FOR_MODULE: &str = "Module";
+const PREFIX_FOR_NATIVE: &str = "__riko_";
 
 /// Writes JNI bindings.
 pub struct JniWriter;
@@ -216,8 +217,9 @@ fn mangle_function_name(name: &str, module: &[String], crate_: &str) -> Ident {
         .map(|ident| ident.replace("_", "_1"))
         .join("_");
     quote::format_ident!(
-        "Java_{}__1_1riko_1Module__1_1riko_1{}",
+        "Java_{}_Module_{}{}",
         &prefix,
+        &PREFIX_FOR_NATIVE.replace("_", "_1"),
         &name.replace("_", "_1")
     )
 }
@@ -257,21 +259,15 @@ mod tests {
     #[test]
     fn mangle_function_name() {
         let none = super::mangle_function_name("function", &[], "riko_sample").to_string();
-        assert_eq!(
-            "Java_riko_1sample__1_1riko_1Module__1_1riko_1function",
-            none
-        );
+        assert_eq!("Java_riko_1sample_Module__1_1riko_1function", none);
         let some_1 =
             super::mangle_function_name("function", &["util".into()], "riko_sample").to_string();
-        assert_eq!(
-            "Java_riko_1sample_util__1_1riko_1Module__1_1riko_1function",
-            some_1
-        );
+        assert_eq!("Java_riko_1sample_util_Module__1_1riko_1function", some_1);
         let some_2 =
             super::mangle_function_name("function", &["util".into(), "unix".into()], "riko_sample")
                 .to_string();
         assert_eq!(
-            "Java_riko_1sample_util_unix__1_1riko_1Module__1_1riko_1function",
+            "Java_riko_1sample_util_unix_Module__1_1riko_1function",
             some_2
         )
     }
@@ -281,8 +277,8 @@ mod tests {
         let expected = r#"
             package riko_sample.example;
 
-            public final class __riko_Module {
-                private __riko_Module() {}
+            public final class Module {
+                private Module() {}
             }
         "#;
         let ir = Crate {
@@ -353,7 +349,7 @@ mod tests {
             .to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_riko_1sample_util__1_1riko_1Module__1_1riko_1function(
+            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass
             ) {
@@ -418,7 +414,7 @@ mod tests {
             .to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_riko_1sample_util__1_1riko_1Module__1_1riko_1function(
+            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass
             ) {
@@ -512,7 +508,7 @@ mod tests {
             .to_string();
         let expected = quote! {
             #[no_mangle]
-            pub extern "C" fn Java_riko_1sample_util__1_1riko_1Module__1_1riko_1function(
+            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass,
                 arg_0_jni: ::jni::sys::jbyteArray,
