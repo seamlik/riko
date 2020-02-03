@@ -1,5 +1,6 @@
 //! Syntax tree parsing.
 
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -100,6 +101,7 @@ impl Parse for Fun {
 /// is not supported (e.g. `&String` works but `&str` doesn't).
 ///
 /// For returned types, only owned types are supported.
+#[derive(PartialEq, Debug)]
 pub enum MarshalingRule {
     /// Marshals a boolean value.
     Bool,
@@ -124,7 +126,7 @@ pub enum MarshalingRule {
     /// User must specify the marshaling rule in the form of `Struct<fully-qualified type path>`.
     /// Alternatively, one may obmit the rule and use the fully-qualified type path in the function
     /// signature.
-    Struct(Path),
+    Struct(Assertable<Path>),
 
     /// Marshals a [String].
     String,
@@ -138,10 +140,10 @@ impl MarshalingRule {
             "I8" => Ok(Self::I8),
             "I32" => Ok(Self::I32),
             "I64" => Ok(Self::I64),
-            "Struct" => Ok(Self::Struct(Path {
+            "Struct" => Ok(Self::Struct(Assertable(Path {
                 leading_colon: None,
                 segments: Punctuated::new(),
-            })),
+            }))),
             "String" => Ok(Self::String),
             _ => Err(syn::Error::new_spanned(src, "Invalid marshaling rule")),
         }
@@ -155,7 +157,7 @@ impl MarshalingRule {
             Self::I8 => syn::parse_quote! { i8 },
             Self::I32 => syn::parse_quote! { i32 },
             Self::I64 => syn::parse_quote! { i64 },
-            Self::Struct(inner) => Type::Path(TypePath {
+            Self::Struct(Assertable(inner)) => Type::Path(TypePath {
                 qself: None,
                 path: inner.clone(),
             }),
@@ -215,7 +217,7 @@ impl MarshalingRule {
         } else if Candidate::Struct(&["", "serde_bytes", "ByteBuf"]).matches(&type_path_str) {
             Ok(Self::Bytes)
         } else {
-            Ok(Self::Struct(type_path.clone()))
+            Ok(Self::Struct(Assertable(type_path.clone())))
         }
     }
 }
@@ -224,7 +226,7 @@ impl Parse for MarshalingRule {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name: Ident = input.parse()?;
         let mut result = Self::from_name(&name)?;
-        if let Self::Struct(ref mut inner) = result {
+        if let Self::Struct(Assertable(ref mut inner)) = result {
             input.parse::<Token![<]>()?;
             *inner = input.parse()?;
             input.parse::<Token![>]>()?;
@@ -233,28 +235,36 @@ impl Parse for MarshalingRule {
     }
 }
 
-impl PartialEq for MarshalingRule {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Struct(left), Self::Struct(right)) => {
-                left.to_token_stream().to_string() == right.to_token_stream().to_string()
-            }
-            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
-        }
+/// Wraps a [syn] type for unit tests.
+///
+/// Most [syn] types don't implement [Debug] or [PartialEq] which makes them unable to be used in
+/// [assert_eq]. This type fixes the problem.
+pub struct Assertable<T>(pub T);
+
+impl<T> AsRef<T> for Assertable<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
     }
 }
 
-impl Debug for MarshalingRule {
+impl<T: ToTokens> Debug for Assertable<T> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            Self::Bool => write!(f, "Bool"),
-            Self::Bytes => write!(f, "Bytes"),
-            Self::I8 => write!(f, "I8"),
-            Self::I32 => write!(f, "I32"),
-            Self::I64 => write!(f, "I64"),
-            Self::Struct(inner) => write!(f, "Struct {{ {} }}", inner.to_token_stream()),
-            Self::String => write!(f, "String"),
+        write!(f, "{:?}", self.0.to_token_stream().to_string())
+    }
+}
+
+impl<T: ToTokens> PartialEq for Assertable<T> {
+    fn eq(&self, other: &Self) -> bool {
+        fn to_string<T: ToTokens>(a: &T) -> String {
+            a.to_token_stream().to_string()
         }
+        to_string(&self.0) == to_string(&other.0)
+    }
+}
+
+impl<T: ToTokens> ToTokens for Assertable<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens)
     }
 }
 
@@ -298,7 +308,7 @@ mod tests {
                 "{:?}",
                 syn::parse_str::<MarshalingRule>("Struct<org::example::Love>").unwrap()
             ),
-            "Struct { org :: example :: Love }"
+            r#"Struct("org :: example :: Love")"#
         );
         assert_eq!(
             format!("{:?}", syn::parse_str::<MarshalingRule>("String").unwrap()),
@@ -396,7 +406,7 @@ mod tests {
         );
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { org::example::Love }).unwrap(),
-            MarshalingRule::Struct(syn::parse_quote! { org::example::Love })
+            MarshalingRule::Struct(Assertable::<Path>(syn::parse_quote! { org::example::Love }))
         );
     }
 }
