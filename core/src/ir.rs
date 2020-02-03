@@ -3,12 +3,15 @@
 //! These types are generated after parsing a Rust source file containing Riko attributes. They
 //! contain the information sufficient for generating target code.
 
+use crate::parse::Assertable;
 use crate::parse::Fun;
 use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use quote::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
+use syn::AttrStyle;
+use syn::Attribute;
 use syn::FnArg;
 use syn::Item;
 use syn::ItemFn;
@@ -51,6 +54,17 @@ fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn
     }
 }
 
+fn extract_cfg(src: impl Iterator<Item = Attribute>) -> Vec<Assertable<Attribute>> {
+    src.filter(|attr| attr.path.to_token_stream().to_string() == "cfg")
+        .map(|mut attr| {
+            if let AttrStyle::Inner(_) = attr.style {
+                attr.style = AttrStyle::Outer;
+            }
+            Assertable(attr)
+        })
+        .collect()
+}
+
 /// Crate.
 ///
 /// This is the root of an IR tree.
@@ -72,9 +86,25 @@ impl Crate {
             source: ErrorSource::Parse(err),
         })?;
         Ok(Self {
-            modules: Module::parse_items(&file.items, &[], src)?,
+            modules: Module::parse_items(file.items.into_iter(), &[], src, file.attrs.into_iter())?,
             name,
         })
+    }
+
+    /// List of [Module]s in a module path, in the order of appearance in the path.
+    ///
+    /// Used to get a list of all parent [Module]s.
+    fn modules_by_path<'a>(&'a self, path: &[String]) -> Vec<&'a Module> {
+        path.iter()
+            .enumerate()
+            .map(|(idx, _)| {
+                let subpath = &path[..(idx + 1)];
+                self.modules
+                    .iter()
+                    .find(|m| m.path == subpath)
+                    .expect("No such module path")
+            })
+            .collect()
     }
 }
 
@@ -85,6 +115,8 @@ pub struct Module {
 
     /// Full path of this [Module]. An empty path indicates the root module.
     pub path: Vec<String>,
+
+    pub cfg: Vec<Assertable<Attribute>>,
 }
 
 impl Module {
@@ -92,21 +124,22 @@ impl Module {
     ///
     /// # Parameters
     ///
-    /// * `path`: The path of the module being parsed. It serves as the prefix of the paths of all
+    /// * `module_path`: The path of the module being parsed. It serves as the prefix of the paths of all
     ///   of its child modules.
     ///
     /// # Returns
     ///
     /// Contains the module being parsed and all its child modules.
     fn parse_items(
-        items: &[Item],
+        items: impl Iterator<Item = Item>,
         module_path: &[String],
         file_path: &Path,
+        attrs: impl Iterator<Item = Attribute>,
     ) -> Result<Vec<Self>, crate::Error> {
         let mut result = Vec::<Self>::new();
         let mut functions = Vec::<Function>::new();
 
-        for item in items.iter() {
+        for item in items {
             match item {
                 Item::Fn(inner) => {
                     if inner
@@ -130,6 +163,7 @@ impl Module {
         result.push(Self {
             functions,
             path: module_path.into(),
+            cfg: extract_cfg(attrs),
         });
         Ok(result)
     }
@@ -147,7 +181,7 @@ impl Module {
     ///
     /// * [parse_items]
     fn parse_module(
-        module: &ItemMod,
+        module: ItemMod,
         module_path_parent: &[String],
         file_path_parent: &Path,
     ) -> Result<Vec<Self>, crate::Error> {
@@ -155,15 +189,20 @@ impl Module {
         module_path_child.push(module.ident.to_string());
 
         let file_path_child =
-            resolve_module_path(file_path_parent.to_owned(), module).map_err(|err| {
+            resolve_module_path(file_path_parent.to_owned(), &module).map_err(|err| {
                 crate::Error {
                     file: file_path_parent.to_owned(),
                     source: ErrorSource::Parse(err),
                 }
             })?;
 
-        if let Some((_, items)) = &module.content {
-            Self::parse_items(items, &module_path_child, &file_path_parent)
+        if let Some((_, items)) = module.content {
+            Self::parse_items(
+                items.into_iter(),
+                &module_path_child,
+                &file_path_parent,
+                module.attrs.into_iter(),
+            )
         } else {
             log::info!("Reading `{}`", file_path_child.display());
             let raw = std::fs::read_to_string(&file_path_child).map_err(|err| crate::Error {
@@ -177,7 +216,12 @@ impl Module {
                 file: file_path_child.to_owned(),
                 source: ErrorSource::Parse(err),
             })?;
-            Self::parse_items(&ast.items, &module_path_child, &file_path_child)
+            Self::parse_items(
+                ast.items.into_iter(),
+                &module_path_child,
+                &file_path_child,
+                ast.attrs.into_iter(),
+            )
         }
     }
 }
@@ -188,6 +232,7 @@ pub struct Function {
     pub inputs: Vec<Input>,
     pub name: String,
     pub output: Option<MarshalingRule>,
+    pub cfg: Vec<Assertable<Attribute>>,
 
     /// Public name exported to the target side.
     pub pubname: String,
@@ -195,18 +240,18 @@ pub struct Function {
 
 impl Function {
     /// Parses an [ItemFn]. The item must be marked by a `#[riko::fun]`.
-    fn parse(item: &ItemFn) -> syn::Result<Self> {
+    fn parse(item: ItemFn) -> syn::Result<Self> {
         let name = item.sig.ident.to_string();
 
-        let attr = item
+        let fun_attrs = item
             .attrs
             .iter()
             .find(|x| x.path.to_token_stream().to_string() == "riko :: fun")
             .expect("Expect a `#[riko::fun]`");
-        let mut args: Fun = if attr.tokens.is_empty() {
+        let mut args: Fun = if fun_attrs.tokens.is_empty() {
             Default::default()
         } else {
-            attr.parse_args()?
+            fun_attrs.parse_args()?
         };
         args.expand_all_fields(&item.sig)?;
 
@@ -219,7 +264,21 @@ impl Function {
             },
             name,
             output: args.marshal,
+            cfg: extract_cfg(item.attrs.into_iter()),
         })
+    }
+
+    /// Collects all `#[cfg]` in `self` and all its parent [Module].
+    pub fn collect_cfg<'a>(
+        &'a self,
+        module: &'a Module,
+        root: &'a Crate,
+    ) -> Vec<&Assertable<Attribute>> {
+        root.modules_by_path(&module.path)
+            .iter()
+            .flat_map(|m| m.cfg.iter())
+            .chain(self.cfg.iter())
+            .collect()
     }
 }
 
@@ -275,7 +334,7 @@ mod test {
 
     #[test]
     fn function() {
-        let mut function: syn::ItemFn = syn::parse_quote! {
+        let function: syn::ItemFn = syn::parse_quote! {
             #[riko::fun(marshal = "I32", name = "function2")]
             fn function(
                 a: bool,
@@ -299,8 +358,9 @@ mod test {
             ],
             output: Some(MarshalingRule::I32),
             pubname: "function2".into(),
+            cfg: Default::default(),
         };
-        let actual = Function::parse(&mut function).unwrap();
+        let actual = Function::parse(function).unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -335,5 +395,50 @@ mod test {
             },
         ];
         assert_eq!(Input::parse(function.sig.inputs.iter()).unwrap(), actual)
+    }
+
+    #[test]
+    fn cfg() {
+        let module: ItemMod = syn::parse_quote! {
+            #[cfg(feature = "riko_outer")]
+            mod util {
+                #![cfg(feature = "riko_inner")]
+
+                #[cfg(feature = "util_outer")]
+                mod linux {
+                    #![cfg(feature = "util_inner")]
+
+                    #[cfg(feature = "function_outer")]
+                    #[riko::fun]
+                    fn function() {
+                        #![cfg(feature = "function_inner")]
+                        unimplemented!()
+                    }
+                }
+            }
+        };
+        let ir = Crate {
+            name: "riko_sample".into(),
+            modules: Module::parse_module(module, &[], &PathBuf::default()).unwrap(),
+        };
+
+        let expected = [
+            r#"# [ cfg ( feature = "riko_outer" ) ]"#,
+            r#"# [ cfg ( feature = "riko_inner" ) ]"#,
+            r#"# [ cfg ( feature = "util_outer" ) ]"#,
+            r#"# [ cfg ( feature = "util_inner" ) ]"#,
+            r#"# [ cfg ( feature = "function_outer" ) ]"#,
+            r#"# [ cfg ( feature = "function_inner" ) ]"#,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+        let actual = ir.modules[0].functions[0]
+            .collect_cfg(&ir.modules[0], &ir)
+            .into_iter()
+            .map(|a| a.to_token_stream().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(expected, actual)
     }
 }

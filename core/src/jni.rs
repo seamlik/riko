@@ -157,7 +157,11 @@ impl TargetCodeWriter for JniWriter {
             quote! { -> ::jni::sys::jbyteArray }
         };
 
+        // Inherited `#[cfg]`
+        let cfg = function.collect_cfg(module, root);
+
         let result: ItemFn = syn::parse_quote! {
+            #(#cfg)*
             #[no_mangle]
             pub extern "C" fn #mangled_name(#(#result_params),*) #result_output {
                 #result_block_invocation
@@ -286,6 +290,7 @@ mod tests {
             modules: vec![Module {
                 functions: vec![],
                 path: vec!["example".into()],
+                cfg: Default::default(),
             }],
         };
         let actual = JniWriter.write_target_module(&ir.modules[0], &ir);
@@ -311,8 +316,10 @@ mod tests {
                     inputs: vec![],
                     output: None,
                     pubname: "function".into(),
+                    cfg: Default::default(),
                 }],
                 path: vec!["example".into()],
+                cfg: Default::default(),
             }],
         };
         let actual =
@@ -334,8 +341,10 @@ mod tests {
                     inputs: vec![],
                     output: None,
                     pubname: "function".into(),
+                    cfg: Default::default(),
                 }],
                 path: vec!["util".into()],
+                cfg: Default::default(),
             }],
         };
         let actual = JniWriter
@@ -372,8 +381,10 @@ mod tests {
                     inputs: vec![],
                     output: None,
                     pubname: "function".into(),
+                    cfg: Default::default(),
                 }],
                 path: vec!["example".into()],
+                cfg: Default::default(),
             }],
         };
         let actual =
@@ -395,8 +406,10 @@ mod tests {
                     inputs: vec![],
                     output: None,
                     pubname: "function".into(),
+                    cfg: Default::default(),
                 }],
                 path: vec!["util".into()],
+                cfg: Default::default(),
             }],
         };
         let actual = JniWriter
@@ -453,8 +466,10 @@ mod tests {
                         },
                     ],
                     output: Some(MarshalingRule::String),
+                    cfg: Default::default(),
                 }],
                 path: vec!["example".into()],
+                cfg: Default::default(),
             }],
         };
         let actual =
@@ -485,8 +500,10 @@ mod tests {
                         },
                     ],
                     output: Some(MarshalingRule::String),
+                    cfg: Default::default(),
                 }],
                 path: vec!["util".into()],
+                cfg: Default::default(),
             }],
         };
         let actual = JniWriter
