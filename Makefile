@@ -8,3 +8,7 @@ test: build
 	cargo fmt
 	cargo test
 	mvn test
+
+install:
+	cargo install --path macro
+	mvn install
