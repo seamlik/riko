@@ -1,9 +1,11 @@
 //! Handling heap-allocated objects.
 
 use crate::returned::Returned;
-use rand::Rng;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::atomic::AtomicI32;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -33,46 +35,50 @@ impl<T: Heaped, E: Error> Heaped for Result<T, E> {
 pub type Handle = i32;
 
 /// Thread-safe and type-safe collection of [Heaped]s.
-pub trait Pool<T> {
-    /// Runs an action on a [Heaped].
-    fn peek<R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R;
-
-    /// Drops the object pointed by the [Handle].
-    fn drop(&self, handle: Handle);
-
-    /// Stores an object.
-    fn store(&self, obj: T) -> Handle;
+pub struct Pool<T> {
+    pool: RwLock<HashMap<Handle, Arc<Mutex<T>>>>,
+    counter: AtomicI32,
 }
 
-/// Simple implementation of [Pool].
-pub type SimplePool<T> = RwLock<HashMap<Handle, Arc<Mutex<T>>>>;
-
-impl<T> Pool<T> for SimplePool<T> {
-    fn peek<R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
-        let pool_guard = self.read().expect("Failed to read-lock the pool");
+impl<T> Pool<T> {
+    /// Runs an action on a [Heaped].
+    pub fn peek<R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
+        let pool_guard = self.pool.read().expect("Failed to read-lock the pool");
         let obj_arc = pool_guard[&handle].clone();
-        std::mem::drop(pool_guard);
+        drop(pool_guard);
 
         let mut obj = obj_arc.lock().expect("Failed to lock the object");
         action(&mut *obj)
     }
 
-    fn drop(&self, handle: Handle) {
-        self.write()
+    /// Drops the object pointed by the [Handle].
+    pub fn drop(&self, handle: Handle) {
+        self.pool
+            .write()
             .expect("Failed to write-lock the pool!")
             .remove(&handle);
     }
 
-    fn store(&self, obj: T) -> Handle {
-        let mut pool_guard = self.write().expect("Failed to write-lock the pool!");
-        let mut rng = rand::thread_rng();
-        let handle = loop {
-            let candidate = rng.gen();
-            if !pool_guard.contains_key(&candidate) {
-                break candidate;
-            }
-        };
+    /// Stores an object.
+    pub fn store(&self, obj: T) -> Handle {
+        let mut pool_guard = self.pool.write().expect("Failed to write-lock the pool");
+        let handle = self.counter.fetch_add(1, Ordering::Relaxed);
         pool_guard.insert(handle, Arc::new(Mutex::new(obj)));
         handle
     }
+
+    pub const fn new() -> Lazy<Self> {
+        Lazy::new(Default::default)
+    }
 }
+
+impl<T> Default for Pool<T> {
+    fn default() -> Self {
+        Self {
+            pool: HashMap::with_capacity(0).into(),
+            counter: 0.into(),
+        }
+    }
+}
+
+pub type LazyPool<T> = Lazy<Pool<T>>;

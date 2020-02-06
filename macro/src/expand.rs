@@ -17,9 +17,7 @@ pub fn heaped(item: &ItemStruct) -> TokenStream {
         }
 
         #[allow(non_upper_case_globals)]
-        static #pool_name: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<#struct_name>> = ::once_cell::sync::Lazy::new(
-            ::std::default::Default::default
-        );
+        static #pool_name: ::riko_runtime::heap::LazyPool<#struct_name> = ::riko_runtime::heap::Pool::new();
     };
     result
 }
@@ -56,9 +54,7 @@ mod tests {
             }
 
             #[allow(non_upper_case_globals)]
-            static __riko_POOL_NuclearReactor: ::once_cell::sync::Lazy<::riko_runtime::heap::SimplePool<NuclearReactor>> = ::once_cell::sync::Lazy::new(
-                ::std::default::Default::default
-            );
+            static __riko_POOL_NuclearReactor: ::riko_runtime::heap::LazyPool<NuclearReactor> = ::riko_runtime::heap::Pool::new();
         }.to_string();
 
         assert_eq!(expected, actual);

@@ -3,6 +3,8 @@
 //! End user need only to care about the types and functions at the root level. Anything in the
 //! other modules are only used by generated code.
 
+#![feature(const_fn)]
+
 use ::jni::sys::jbyteArray;
 use ::jni::JNIEnv;
 use serde::de::DeserializeOwned;
