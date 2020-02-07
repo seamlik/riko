@@ -49,5 +49,4 @@ The mandatory ones are:
 The optional ones are:
 
 * Interfacing with JNI: [jni](https://crates.io/crates/jni)
-* Using objects: [once_cell](https://crates.io/crates/once_cell)
 * Marshaling byte arrays: [serde_bytes](https://crates.io/crates/serde_bytes)

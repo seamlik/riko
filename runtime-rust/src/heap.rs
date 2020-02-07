@@ -2,6 +2,7 @@
 
 use crate::returned::Returned;
 use once_cell::sync::Lazy;
+use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::atomic::AtomicI32;
@@ -34,21 +35,28 @@ impl<T: Heaped, E: Error> Heaped for Result<T, E> {
 /// Opaque handle pointing to a [Heaped].
 pub type Handle = i32;
 
-/// Thread-safe and type-safe collection of [Heaped]s.
-pub struct Pool<T> {
-    pool: RwLock<HashMap<Handle, Arc<Mutex<T>>>>,
+/// The global [Pool] that every [Heaped] is stored.
+pub static POOL: Lazy<Pool> = Lazy::new(Default::default);
+
+/// Thread-safe collection of [Heaped]s.
+pub struct Pool {
+    pool: RwLock<HashMap<Handle, Arc<Mutex<dyn Any + Send>>>>,
     counter: AtomicI32,
 }
 
-impl<T> Pool<T> {
+impl Pool {
     /// Runs an action on a [Heaped].
-    pub fn peek<R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
+    pub fn peek<T: Any, R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
         let pool_guard = self.pool.read().expect("Failed to read-lock the pool");
         let obj_arc = pool_guard[&handle].clone();
         drop(pool_guard);
 
         let mut obj = obj_arc.lock().expect("Failed to lock the object");
-        action(&mut *obj)
+        if let Some(obj_concrete) = obj.downcast_mut::<T>() {
+            action(obj_concrete)
+        } else {
+            panic!("Incorrect data type pointed by this handle")
+        }
     }
 
     /// Drops the object pointed by the [Handle].
@@ -60,7 +68,7 @@ impl<T> Pool<T> {
     }
 
     /// Stores an object.
-    pub fn store(&self, obj: T) -> Handle {
+    pub fn store<T: Any + Send>(&self, obj: T) -> Handle {
         let mut pool_guard = self.pool.write().expect("Failed to write-lock the pool");
         let handle = self.counter.fetch_add(1, Ordering::Relaxed);
         pool_guard.insert(handle, Arc::new(Mutex::new(obj)));
@@ -72,7 +80,7 @@ impl<T> Pool<T> {
     }
 }
 
-impl<T> Default for Pool<T> {
+impl Default for Pool {
     fn default() -> Self {
         Self {
             pool: HashMap::with_capacity(0).into(),
@@ -80,5 +88,3 @@ impl<T> Default for Pool<T> {
         }
     }
 }
-
-pub type LazyPool<T> = Lazy<Pool<T>>;

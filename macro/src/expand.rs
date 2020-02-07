@@ -7,17 +7,13 @@ use syn::ItemFn;
 use syn::ItemStruct;
 
 pub fn heaped(item: &ItemStruct) -> TokenStream {
-    let pool_name = quote::format_ident!("__riko_POOL_{}", item.ident);
     let struct_name = &item.ident;
     let result = quote! {
         impl ::riko_runtime::heap::Heaped for #struct_name {
             fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                ::riko_runtime::heap::Pool::store(&*#pool_name, self).into()
+                ::riko_runtime::heap::Pool::store(&*::riko_runtime::heap::POOL, self).into()
             }
         }
-
-        #[allow(non_upper_case_globals)]
-        static #pool_name: ::riko_runtime::heap::LazyPool<#struct_name> = ::riko_runtime::heap::Pool::new();
     };
     result
 }
@@ -49,12 +45,9 @@ mod tests {
         let expected = quote ! {
             impl ::riko_runtime::heap::Heaped for NuclearReactor {
                 fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                    ::riko_runtime::heap::Pool::store(&*__riko_POOL_NuclearReactor, self).into()
+                    ::riko_runtime::heap::Pool::store(&*::riko_runtime::heap::POOL, self).into()
                 }
             }
-
-            #[allow(non_upper_case_globals)]
-            static __riko_POOL_NuclearReactor: ::riko_runtime::heap::LazyPool<NuclearReactor> = ::riko_runtime::heap::Pool::new();
         }.to_string();
 
         assert_eq!(expected, actual);
