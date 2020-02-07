@@ -10,7 +10,7 @@ For all supported language targets, consult the modules in [riko_core](https://d
 Contrary to the general atmosphere of Rust's ecosystem, the generated code is not zero-cost abstraction (hence the name "sub-optimal"). Overhead is imposed at various situations:
 
 * Marshaling data across FFI boundary involves encoding and decoding [CBOR](https://cbor.io).
-* Using a object (as in object-oriented programming) requires allocating memory in a global pool protected by a mutex.
+* Using an object (as in object-oriented programming) requires allocating memory in a global pool protected by locks.
 * Data is always copied between FFI boundary because pointers or references are not supported.
 
 Usage

@@ -280,7 +280,7 @@ fn assert_lit_is_litstr(src: &Lit) -> syn::Result<&LitStr> {
     if let Lit::Str(litstr) = src {
         Ok(litstr)
     } else {
-        Err(syn::Error::new_spanned(src, "Invalid value"))
+        Err(syn::Error::new_spanned(src, "Expect a string literal"))
     }
 }
 
