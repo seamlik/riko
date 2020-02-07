@@ -3,8 +3,11 @@
 //! These types are generated after parsing a Rust source file containing Riko attributes. They
 //! contain the information sufficient for generating target code.
 
+use crate::parse::Args;
 use crate::parse::Assertable;
+use crate::parse::Expanded;
 use crate::parse::Fun;
+use crate::parse::Marshal;
 use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use quote::ToTokens;
@@ -18,7 +21,6 @@ use syn::ItemFn;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Meta;
-use syn::MetaNameValue;
 use syn::Type;
 
 fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
@@ -139,19 +141,17 @@ impl Module {
         let mut result = Vec::<Self>::new();
         let mut functions = Vec::<Function>::new();
 
+        let conv_err = |err| crate::Error {
+            file: file_path.to_owned(),
+            source: ErrorSource::Riko(err),
+        };
+
         for item in items {
             match item {
                 Item::Fn(inner) => {
-                    if inner
-                        .attrs
-                        .iter()
-                        .any(|x| x.path.to_token_stream().to_string() == "riko :: fun")
-                    {
-                        let f = Function::parse(inner).map_err(|err| crate::Error {
-                            file: file_path.to_owned(),
-                            source: ErrorSource::Riko(err),
-                        })?;
-                        functions.push(f);
+                    if let Some(args) = Fun::take_from(inner.attrs.iter()).map_err(conv_err)? {
+                        let args = args.expand_all_fields(&inner.sig).map_err(conv_err)?;
+                        functions.push(Function::parse(inner, args).map_err(conv_err)?);
                     }
                 }
                 Item::Mod(inner) => match Self::parse_module(inner, module_path, file_path) {
@@ -252,24 +252,17 @@ pub struct Function {
 }
 
 impl Function {
-    /// Parses an [ItemFn]. The item must be marked by a `#[riko::fun]`.
-    fn parse(item: ItemFn) -> syn::Result<Self> {
+    /// Parses an [ItemFn].
+    fn parse(item: ItemFn, args: Fun<Expanded>) -> syn::Result<Self> {
         let name = item.sig.ident.to_string();
 
-        let fun_attrs = item
-            .attrs
-            .iter()
-            .find(|x| x.path.to_token_stream().to_string() == "riko :: fun")
-            .expect("Expect a `#[riko::fun]`");
-        let mut args: Fun = if fun_attrs.tokens.is_empty() {
-            Default::default()
-        } else {
-            fun_attrs.parse_args()?
-        };
-        args.expand_all_fields(&item.sig)?;
-
         Ok(Self {
-            inputs: Input::parse(item.sig.inputs.iter())?,
+            inputs: item
+                .sig
+                .inputs
+                .iter()
+                .map(Input::parse)
+                .collect::<syn::Result<_>>()?,
             pubname: if args.name.is_empty() {
                 name.clone()
             } else {
@@ -304,41 +297,25 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn parse<'a>(params: impl Iterator<Item = &'a FnArg>) -> syn::Result<Vec<Self>> {
-        params
-            .map(|p| {
-                if let FnArg::Typed(ref inner) = p {
-                    let marshal_attr = inner
-                        .attrs
-                        .iter()
-                        .find(|attr| attr.path.to_token_stream().to_string() == "riko :: marshal");
-                    let rule = if let Some(attr) = marshal_attr {
-                        if let Meta::NameValue(MetaNameValue {
-                            lit: Lit::Str(value),
-                            ..
-                        }) = attr.parse_meta()?
-                        {
-                            value.parse()?
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                attr,
-                                "Invalid `#[riko::marshal]` arguments",
-                            ));
-                        }
-                    } else {
-                        MarshalingRule::infer(&inner.ty)?
-                    };
-                    let borrow = if let Type::Reference(_) = *inner.ty {
-                        true
-                    } else {
-                        false
-                    };
-                    Ok(Self { rule, borrow })
+    fn parse(item: &FnArg) -> syn::Result<Self> {
+        match item {
+            FnArg::Typed(typed) => {
+                let rule = if let Some(args) = Marshal::take_from(typed.attrs.iter())? {
+                    args.value
                 } else {
-                    todo!("`#[fun]` on a method not implemented");
-                }
-            })
-            .collect()
+                    MarshalingRule::infer(&typed.ty)?
+                };
+
+                let borrow = if let Type::Reference(_) = *typed.ty {
+                    true
+                } else {
+                    false
+                };
+
+                Ok(Self { rule, borrow })
+            }
+            FnArg::Receiver(_) => todo!("`#[fun]` on a method not implemented"),
+        }
     }
 }
 
@@ -356,6 +333,11 @@ mod test {
                 unimplemented!()
             }
         };
+        let args = Fun::take_from(function.attrs.iter())
+            .unwrap()
+            .unwrap()
+            .expand_all_fields(&function.sig)
+            .unwrap();
 
         let expected = Function {
             name: "function".into(),
@@ -373,7 +355,7 @@ mod test {
             pubname: "function2".into(),
             cfg: Default::default(),
         };
-        let actual = Function::parse(function).unwrap();
+        let actual = Function::parse(function, args).unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -389,7 +371,7 @@ mod test {
                 unimplemented!()
             }
         };
-        let actual = vec![
+        let expected = vec![
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
@@ -407,7 +389,14 @@ mod test {
                 borrow: true,
             },
         ];
-        assert_eq!(Input::parse(function.sig.inputs.iter()).unwrap(), actual)
+        let actual = function
+            .sig
+            .inputs
+            .iter()
+            .map(Input::parse)
+            .collect::<syn::Result<Vec<Input>>>()
+            .unwrap();
+        assert_eq!(expected, actual)
     }
 
     #[test]

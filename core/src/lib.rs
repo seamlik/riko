@@ -2,6 +2,8 @@
 //!
 //! [bindgen] is the entry point.
 
+#![feature(iter_order_by)]
+
 pub mod ir;
 pub mod jni;
 pub mod parse;

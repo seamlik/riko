@@ -5,14 +5,17 @@ use quote::ToTokens;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::marker::PhantomData;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
+use syn::Attribute;
 use syn::AttributeArgs;
 use syn::Ident;
 use syn::Lit;
 use syn::LitStr;
 use syn::Meta;
+use syn::MetaNameValue;
 use syn::NestedMeta;
 use syn::Path;
 use syn::ReturnType;
@@ -21,11 +24,87 @@ use syn::Token;
 use syn::Type;
 use syn::TypePath;
 
+/// Arguments of a `#[riko::...]`.
+pub trait Args: Sized {
+    /// Full name of the attribute.
+    const NAME: &'static [&'static str];
+
+    /// Finds the first attribute that corresponds to this type and parses it.
+    fn take_from<'a>(mut attrs: impl Iterator<Item = &'a Attribute>) -> syn::Result<Option<Self>> {
+        let eq = |attr: &Attribute| {
+            attr.path
+                .segments
+                .iter()
+                .map(|t| t.to_token_stream().to_string())
+                .eq_by(Self::NAME, |a, b| &a == b)
+        };
+        if let Some(attr) = attrs.find(|attr| eq(attr)) {
+            Ok(Some(Self::parse(attr)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Parses the tokens of an [Attribute].
+    ///
+    /// Only parse the tokens after the attribute name. [take_from](Args::take_from) is responsible for checking if
+    /// it is the right attribute.
+    fn parse(attr: &Attribute) -> syn::Result<Self>;
+}
+
+/// State of an [Args].
+///
+/// An [Args] may contain optional fields that are filled during IR parsing. This type indicates if
+/// an [Args] is fully expanded.
+pub trait ArgsState {}
+
+/// All fields are expanded.
+pub struct Expanded;
+
+impl ArgsState for Expanded {}
+
+/// Freshly parsed from source code.
+#[derive(Debug, PartialEq)]
+pub struct Raw;
+
+impl ArgsState for Raw {}
+
+/// `#[riko::marshal]`
+pub struct Marshal {
+    /// Marshaling rule for a function parameter.
+    ///
+    /// To specify the rule for the return type, provide the `marshal` argument in
+    /// `#[riko::fun]`.
+    pub value: MarshalingRule,
+}
+
+impl Args for Marshal {
+    const NAME: &'static [&'static str] = &["riko", "marshal"];
+
+    fn parse(attr: &Attribute) -> syn::Result<Self> {
+        let rule = if let Meta::NameValue(MetaNameValue {
+            lit: Lit::Str(value),
+            ..
+        }) = attr.parse_meta()?
+        {
+            value.parse()?
+        } else {
+            return Err(syn::Error::new_spanned(
+                attr.tokens.clone(),
+                "Expect a marshaling rule",
+            ));
+        };
+        Ok(Self { value: rule })
+    }
+}
+
 /// `#[riko::fun]`.
 ///
 /// All parameters are optional.
-#[derive(Default, Debug, PartialEq)]
-pub struct Fun {
+#[derive(Debug, PartialEq)]
+pub struct Fun<S: ArgsState> {
+    phantom: PhantomData<S>,
+
     /// Symbol name used when exporting the item, convenient for avoiding name clashes.
     pub name: String,
 
@@ -35,20 +114,50 @@ pub struct Fun {
     pub marshal: Option<MarshalingRule>,
 }
 
-impl Fun {
+impl Fun<Raw> {
     /// Fills in all optional fields by consulting a function signature.
-    pub fn expand_all_fields(&mut self, sig: &Signature) -> syn::Result<()> {
-        if let ReturnType::Type(_, ty) = &sig.output {
+    pub fn expand_all_fields(self, sig: &Signature) -> syn::Result<Fun<Expanded>> {
+        let marshal = if let ReturnType::Type(_, ty) = &sig.output {
             if self.marshal == None {
-                self.marshal = Some(MarshalingRule::infer(ty)?);
+                Some(MarshalingRule::infer(ty)?)
+            } else {
+                self.marshal
             }
-        }
+        } else {
+            None
+        };
 
-        Ok(())
+        Ok(Fun::<Expanded> {
+            phantom: Default::default(),
+            marshal,
+            name: self.name,
+        })
     }
 }
 
-impl TryFrom<AttributeArgs> for Fun {
+impl Default for Fun<Raw> {
+    fn default() -> Self {
+        Self {
+            phantom: Default::default(),
+            marshal: Default::default(),
+            name: Default::default(),
+        }
+    }
+}
+
+impl Args for Fun<Raw> {
+    const NAME: &'static [&'static str] = &["riko", "fun"];
+
+    fn parse(attr: &Attribute) -> syn::Result<Self> {
+        if attr.tokens.is_empty() {
+            Ok(Default::default())
+        } else {
+            attr.parse_args()
+        }
+    }
+}
+
+impl TryFrom<AttributeArgs> for Fun<Raw> {
     type Error = syn::Error;
 
     fn try_from(value: AttributeArgs) -> Result<Self, Self::Error> {
@@ -71,7 +180,7 @@ impl TryFrom<AttributeArgs> for Fun {
     }
 }
 
-impl Parse for Fun {
+impl Parse for Fun<Raw> {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let args: AttributeArgs = Punctuated::<NestedMeta, Token![,]>::parse_terminated(input)?
             .into_iter()
@@ -290,11 +399,12 @@ mod tests {
 
     #[test]
     fn Fun_parse() {
-        let expected = Fun {
+        let expected = Fun::<Raw> {
+            phantom: Default::default(),
             name: "function2".to_owned(),
             marshal: Some(MarshalingRule::String),
         };
-        let actual: Fun = syn::parse_quote! {
+        let actual: Fun<Raw> = syn::parse_quote! {
             name = "function2",
             marshal = "String",
         };
