@@ -44,7 +44,6 @@ Some third party crates are used by the generated code.
 The mandatory ones are:
 
 * Runtime support: [riko_runtime](https://crates.io/crates/riko_runtime)
-* Marshaling data: [serde](https://crates.io/crates/serde) with feature `derive`
 
 The optional ones are:
 
