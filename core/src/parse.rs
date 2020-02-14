@@ -239,6 +239,9 @@ pub enum MarshalingRule {
 
     /// Marshals a [String].
     String,
+
+    /// `()`.
+    Unit,
 }
 
 impl MarshalingRule {
@@ -254,6 +257,7 @@ impl MarshalingRule {
                 segments: Punctuated::new(),
             }))),
             "String" => Ok(Self::String),
+            "Unit" => Ok(Self::Unit),
             _ => Err(syn::Error::new_spanned(src, "Invalid marshaling rule")),
         }
     }
@@ -271,6 +275,7 @@ impl MarshalingRule {
                 path: inner.clone(),
             }),
             Self::String => syn::parse_quote! { ::std::string::String },
+            Self::Unit => syn::parse_quote! { () },
         }
     }
 
@@ -321,6 +326,8 @@ impl MarshalingRule {
             Ok(Self::I64)
         } else if Candidate::Primitive("i8").matches(&type_path_str) {
             Ok(Self::I8)
+        } else if Candidate::Primitive("( )").matches(&type_path_str) {
+            Ok(Self::Unit)
         } else if Candidate::Struct(&["", "std", "string", "String"]).matches(&type_path_str) {
             Ok(Self::String)
         } else if Candidate::Struct(&["", "serde_bytes", "ByteBuf"]).matches(&type_path_str) {
@@ -514,6 +521,12 @@ mod tests {
                 .unwrap(),
             MarshalingRule::Bool
         );
+
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { Result<(), Error> }).unwrap(),
+            MarshalingRule::Unit
+        );
+
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { org::example::Love }).unwrap(),
             MarshalingRule::Struct(Assertable::<Path>(syn::parse_quote! { org::example::Love }))

@@ -208,6 +208,7 @@ fn target_type(rule: &MarshalingRule) -> String {
         MarshalingRule::I64 => "java.lang.Long".into(),
         MarshalingRule::Struct(inner) => inner.to_token_stream().to_string().replace("::", "."),
         MarshalingRule::String => "java.lang.String".into(),
+        MarshalingRule::Unit => "void".into(),
     }
 }
 
