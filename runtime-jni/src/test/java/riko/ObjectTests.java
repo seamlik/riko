@@ -3,11 +3,11 @@ package riko;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class HeapedTests {
+class ObjectTests {
 
-  static class DummyHeaped extends Heaped {
+  static class DummyObject extends Object {
 
-    DummyHeaped() {
+    DummyObject() {
       super(0);
     }
 
@@ -24,7 +24,7 @@ class HeapedTests {
 
   @Test
   void throwsWhenUseAfterFree() {
-    final DummyHeaped obj = new DummyHeaped();
+    final DummyObject obj = new DummyObject();
     Assertions.assertThrows(AssertionError.class, () -> {
       obj.close();
       obj.run();

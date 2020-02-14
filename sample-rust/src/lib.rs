@@ -1,7 +1,7 @@
 #[path = "../../target/riko/bridge.rs"]
 mod bridge;
 
-mod heaped;
+mod object;
 //mod serde;
 
 use serde_bytes::ByteBuf;

@@ -7,7 +7,7 @@ use ::jni::JNIEnv;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-pub mod heap;
+pub mod object;
 pub mod returned;
 
 /// Object marshaled between the FFI boundry.

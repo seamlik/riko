@@ -6,12 +6,12 @@ use syn::FnArg;
 use syn::ItemFn;
 use syn::ItemStruct;
 
-pub fn heaped(item: &ItemStruct) -> TokenStream {
+pub fn object(item: &ItemStruct) -> TokenStream {
     let struct_name = &item.ident;
     let result = quote! {
-        impl ::riko_runtime::heap::Heaped for #struct_name {
-            fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                ::riko_runtime::heap::Pool::store(&*::riko_runtime::heap::POOL, self).into()
+        impl ::riko_runtime::object::Object for #struct_name {
+            fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> {
+                ::riko_runtime::object::Pool::store(&*::riko_runtime::object::POOL, self).into()
             }
         }
     };
@@ -36,16 +36,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn heaped() {
+    fn object() {
         let protagonist: ItemStruct = syn::parse_quote! {
             struct NuclearReactor;
         };
-        let actual = super::heaped(&protagonist).to_string();
+        let actual = super::object(&protagonist).to_string();
 
         let expected = quote ! {
-            impl ::riko_runtime::heap::Heaped for NuclearReactor {
-                fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::heap::Handle> {
-                    ::riko_runtime::heap::Pool::store(&*::riko_runtime::heap::POOL, self).into()
+            impl ::riko_runtime::object::Object for NuclearReactor {
+                fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> {
+                    ::riko_runtime::object::Pool::store(&*::riko_runtime::object::POOL, self).into()
                 }
             }
         }.to_string();

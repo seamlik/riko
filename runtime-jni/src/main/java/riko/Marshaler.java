@@ -13,7 +13,7 @@ public class Marshaler {
   /**
    * Serializes an object.
    */
-  public static byte[] toBytes(final Object src) {
+  public static byte[] toBytes(final java.lang.Object src) {
     try {
       return MAPPER.writeValueAsBytes(src);
     } catch (final Exception err) {

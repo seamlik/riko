@@ -16,11 +16,11 @@ use std::sync::RwLock;
 /// These objects are allocated and freed on the Rust side while only expose a reference to the
 /// target side. Target code must integrate the manual memory management into its own mechanism as
 /// those memory management strategy (usually garbage collection) is not aware of any native code.
-pub trait Heaped: Sized {
+pub trait Object: Sized {
     fn into_handle(self) -> Returned<Handle>;
 }
 
-impl<T: Heaped, E: Error> Heaped for Result<T, E> {
+impl<T: Object, E: Error> Object for Result<T, E> {
     fn into_handle(self) -> Returned<Handle> {
         match self {
             Ok(obj) => obj.into_handle(),
@@ -32,20 +32,20 @@ impl<T: Heaped, E: Error> Heaped for Result<T, E> {
     }
 }
 
-/// Opaque handle pointing to a [Heaped].
+/// Opaque handle pointing to a [Object].
 pub type Handle = i32;
 
-/// The global [Pool] that every [Heaped] is stored.
+/// The global [Pool] that every [Object] is stored.
 pub static POOL: Lazy<Pool> = Lazy::new(Default::default);
 
-/// Thread-safe collection of [Heaped]s.
+/// Thread-safe collection of [Object]s.
 pub struct Pool {
     pool: RwLock<HashMap<Handle, Arc<Mutex<dyn Any + Send>>>>,
     counter: AtomicI32,
 }
 
 impl Pool {
-    /// Runs an action on a [Heaped].
+    /// Runs an action on a [Object].
     pub fn peek<T: Any, R>(&self, handle: Handle, action: impl FnOnce(&mut T) -> R) -> R {
         let pool_guard = self.pool.read().expect("Failed to read-lock the pool");
         let obj_arc = pool_guard[&handle].clone();

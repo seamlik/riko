@@ -1,4 +1,4 @@
 use riko::*;
 
-#[derive(Heaped)]
+#[derive(Object)]
 struct NuclearReactor;

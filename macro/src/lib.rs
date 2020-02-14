@@ -45,8 +45,8 @@ pub fn fun(_: TokenStream, item: TokenStream) -> TokenStream {
 /// Deriving this trait allows code on the target side to construct an object and put it on the
 /// heap. This is achieved by creating a global object pool dedicated to the type deriving the
 /// trait.
-#[proc_macro_derive(Heaped)]
-pub fn derive_heap(item: TokenStream) -> TokenStream {
+#[proc_macro_derive(Object)]
+pub fn derive_object(item: TokenStream) -> TokenStream {
     let item = syn::parse_macro_input!(item as ItemStruct);
-    expand::heaped(&item).into()
+    expand::object(&item).into()
 }
