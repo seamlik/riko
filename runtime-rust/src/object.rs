@@ -16,14 +16,36 @@ use std::sync::RwLock;
 /// These objects are allocated and freed on the Rust side while only expose a reference to the
 /// target side. Target code must integrate the manual memory management into its own mechanism as
 /// those memory management strategy (usually garbage collection) is not aware of any native code.
-pub trait Object: Sized {
-    fn into_handle(self) -> Returned<Handle>;
-}
+pub trait Object: Any + Sized + Send {
+    /// Shelves an object into [POOL].
+    fn shelve_self(self) -> Returned<Handle> {
+        POOL.store(self).into()
+    }
 
-impl<T: Object, E: Error> Object for Result<T, E> {
-    fn into_handle(self) -> Returned<Handle> {
-        match self {
-            Ok(obj) => obj.into_handle(),
+    /// Shelves an object in a [Result].
+    fn shelve_result<E: Error>(src: Result<Self, E>) -> Returned<Handle> {
+        match src {
+            Ok(obj) => obj.shelve_self(),
+            Err(err) => Returned {
+                error: Some(err.into()),
+                value: None,
+            },
+        }
+    }
+
+    /// Shelves an optional object.
+    fn shelve_option(src: Option<Self>) -> Returned<Handle> {
+        match src {
+            Some(obj) => obj.shelve_self(),
+            None => Default::default(),
+        }
+    }
+
+    /// Shelves an optional object in a [Result].
+    fn shelve_result_option<E: Error>(src: Result<Option<Self>, E>) -> Returned<Handle> {
+        match src {
+            Ok(Some(obj)) => obj.shelve_self(),
+            Ok(None) => Default::default(),
             Err(err) => Returned {
                 error: Some(err.into()),
                 value: None,
@@ -31,6 +53,8 @@ impl<T: Object, E: Error> Object for Result<T, E> {
         }
     }
 }
+
+impl<T: Any + Sized + Send> Object for T {}
 
 /// Opaque handle pointing to a [Object].
 pub type Handle = i32;

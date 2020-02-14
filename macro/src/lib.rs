@@ -9,7 +9,6 @@ mod expand;
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::ItemFn;
-use syn::ItemStruct;
 
 /// Specifies marshaling rule for a function parameter.
 ///
@@ -38,15 +37,4 @@ pub fn fun(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut subject = syn::parse_macro_input!(item as ItemFn);
     expand::remove_marshal_attrs(&mut subject);
     subject.into_token_stream().into()
-}
-
-/// Generates language bindings for a Rust type allocated on the heap.
-///
-/// Deriving this trait allows code on the target side to construct an object and put it on the
-/// heap. This is achieved by creating a global object pool dedicated to the type deriving the
-/// trait.
-#[proc_macro_derive(Object)]
-pub fn derive_object(item: TokenStream) -> TokenStream {
-    let item = syn::parse_macro_input!(item as ItemStruct);
-    expand::object(&item).into()
 }

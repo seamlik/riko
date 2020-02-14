@@ -1,22 +1,7 @@
-use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
 use syn::Attribute;
 use syn::FnArg;
 use syn::ItemFn;
-use syn::ItemStruct;
-
-pub fn object(item: &ItemStruct) -> TokenStream {
-    let struct_name = &item.ident;
-    let result = quote! {
-        impl ::riko_runtime::object::Object for #struct_name {
-            fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> {
-                ::riko_runtime::object::Pool::store(&*::riko_runtime::object::POOL, self).into()
-            }
-        }
-    };
-    result
-}
 
 pub fn remove_marshal_attrs(function: &mut ItemFn) {
     fn remove(attrs: &mut Vec<Attribute>) {
@@ -34,24 +19,6 @@ pub fn remove_marshal_attrs(function: &mut ItemFn) {
 
 mod tests {
     use super::*;
-
-    #[test]
-    fn object() {
-        let protagonist: ItemStruct = syn::parse_quote! {
-            struct NuclearReactor;
-        };
-        let actual = super::object(&protagonist).to_string();
-
-        let expected = quote ! {
-            impl ::riko_runtime::object::Object for NuclearReactor {
-                fn into_handle(self) -> ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> {
-                    ::riko_runtime::object::Pool::store(&*::riko_runtime::object::POOL, self).into()
-                }
-            }
-        }.to_string();
-
-        assert_eq!(expected, actual);
-    }
 
     #[test]
     fn remove_marshal_attrs() {

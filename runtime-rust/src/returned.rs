@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Returned<T> {
     pub error: Option<Error>,
     pub value: Option<T>,
