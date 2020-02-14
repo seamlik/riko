@@ -13,7 +13,7 @@ public class Marshaler {
   /**
    * Serializes an object.
    */
-  public static byte[] toBytes(final java.lang.Object src) {
+  public static byte[] encode(final java.lang.Object src) {
     try {
       return MAPPER.writeValueAsBytes(src);
     } catch (final Exception err) {
@@ -24,7 +24,7 @@ public class Marshaler {
   /**
    * Deserializes an object.
    */
-  public static <T> Returned<T> fromBytes(final byte[] src) {
+  public static <T> Returned<T> decode(final byte[] src) {
     try {
       return MAPPER.readValue(src, new TypeReference<Returned<T>>() {});
     } catch (final Exception err) {

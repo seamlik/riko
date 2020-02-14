@@ -57,7 +57,7 @@ impl TargetCodeWriter for JniWriter {
         } else {
             format!(
                 r#"
-                    final riko.Returned<{}> result = riko.Marshaler.fromBytes(returned);
+                    final riko.Returned<{}> result = riko.Marshaler.decode(returned);
                     return result.unwrap();
                 "#,
                 return_type_result
@@ -67,7 +67,7 @@ impl TargetCodeWriter for JniWriter {
             .inputs
             .iter()
             .enumerate()
-            .map(|(idx, _)| format!("riko.Marshaler.toBytes(arg_{})", idx))
+            .map(|(idx, _)| format!("riko.Marshaler.encode(arg_{})", idx))
             .join(", ");
         let params_public = function
             .inputs
@@ -438,10 +438,10 @@ mod tests {
                 final java.lang.Long arg_1
             ) {
                 final byte[] returned = __riko_function(
-                    riko.Marshaler.toBytes(arg_0),
-                    riko.Marshaler.toBytes(arg_1)
+                    riko.Marshaler.encode(arg_0),
+                    riko.Marshaler.encode(arg_1)
                 );
-                final riko.Returned<java.lang.String> result = riko.Marshaler.fromBytes(returned);
+                final riko.Returned<java.lang.String> result = riko.Marshaler.decode(returned);
                 return result.unwrap();
             }
         "#;
