@@ -11,6 +11,7 @@ pub mod parse;
 use ir::Crate;
 use ir::Function;
 use ir::Module;
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use regex::Regex;
 use std::collections::BTreeMap;
@@ -29,31 +30,18 @@ pub trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
     fn write_target_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error>;
 
-    /// Generates all code.
-    fn write_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error> {
-        self.write_target_all(ir, output_directory)?;
-
-        let mut bridge_path = output_directory.to_owned();
-        bridge_path.push("bridge.rs");
-        let mut bridge_file = open_file(&bridge_path).map_err(|err| Error {
-            file: bridge_path.to_owned(),
-            source: ErrorSource::Write(err),
-        })?;
-        for module in ir.modules.iter() {
+    /// Generates all bridge code.
+    fn write_bridge_all(&self, root: &Crate) -> Result<TokenStream, Error> {
+        let mut result = TokenStream::default();
+        for module in root.modules.iter() {
             for function in module.functions.iter() {
-                let bridge = self
-                    .write_bridge_function(function, module, ir)
-                    .into_token_stream()
-                    .to_string();
-                bridge_file
-                    .write_all(bridge.as_bytes())
-                    .map_err(|err| Error {
-                        file: bridge_path.to_owned(),
-                        source: ErrorSource::Write(err),
-                    })?;
+                result.extend(
+                    self.write_bridge_function(function, module, root)
+                        .into_token_stream(),
+                );
             }
         }
-        Ok(())
+        Ok(result)
     }
 
     /// Generates Rust bridge code for a function.
@@ -95,12 +83,29 @@ pub fn bindgen<'a>(
     output_directory: &Path,
     targets: impl Iterator<Item = &'a String>,
 ) -> Result<(), Error> {
+    let mut bridge = TokenStream::default();
     for (target, writer) in create_target_code_writers(targets).into_iter() {
         let mut target_output_directory = output_directory.to_owned();
         target_output_directory.push(target);
 
-        writer.write_all(&ir, &target_output_directory)?;
+        writer.write_target_all(&ir, &target_output_directory)?;
+        bridge.extend(writer.write_bridge_all(&ir)?);
     }
+
+    let mut bridge_path = output_directory.to_owned();
+    bridge_path.push("bridge.rs");
+
+    let mut bridge_file = open_file(&bridge_path).map_err(|err| Error {
+        file: bridge_path.to_owned(),
+        source: ErrorSource::Write(err),
+    })?;
+    bridge_file
+        .write_all(bridge.to_string().as_bytes())
+        .map_err(|err| Error {
+            file: bridge_path.to_owned(),
+            source: ErrorSource::Write(err),
+        })?;
+
     Ok(())
 }
 

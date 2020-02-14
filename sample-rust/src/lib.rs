@@ -1,4 +1,4 @@
-#[path = "../../target/riko/jni/bridge.rs"]
+#[path = "../../target/riko/bridge.rs"]
 mod bridge;
 
 mod heaped;
