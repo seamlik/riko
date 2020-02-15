@@ -17,17 +17,7 @@ struct Life {
 }
 
 #[riko::fun]
-fn serde_inferred(love: crate::serde::Love, work: crate::serde::Work) -> crate::serde::Life {
-    crate::serde::Life {
-        happy: !love.target.is_empty() && work.salary > 0,
-    }
-}
-
-#[riko::fun(marshal = "Struct<crate::serde::Life>")]
-fn serde_explicit(
-    #[riko::marshal(Struct<crate::serde::Love>)] love: Love,
-    #[riko::marshal(Struct<crate::serde::Work>)] work: Work,
-) -> crate::serde::Life {
+fn struct_(love: crate::serde::Love, work: crate::serde::Work) -> crate::serde::Life {
     Life {
         happy: !love.target.is_empty() && work.salary > 0,
     }

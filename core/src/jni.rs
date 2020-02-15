@@ -2,8 +2,8 @@
 
 use crate::ir::Crate;
 use crate::ir::Function;
+use crate::ir::MarshalingRule;
 use crate::ir::Module;
-use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use crate::TargetCodeWriter;
 use itertools::Itertools;
@@ -39,20 +39,14 @@ impl TargetCodeWriter for JniWriter {
     }
 
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
-        let return_type_result = match &function.output {
-            None => "void".into(),
-            Some(inner) => target_type(inner),
-        };
-        let return_type_public = match &function.output {
-            None => "void".into(),
-            Some(inner) => target_type(inner),
-        };
-        let return_prefix = if function.output.is_none() {
+        let return_type_public =
+            target_type(function.output.rule, &function.output.unwrapped_type.0);
+        let return_prefix = if function.output.rule == MarshalingRule::Unit {
             ""
         } else {
             "final byte[] returned ="
         };
-        let return_block = if function.output.is_none() {
+        let return_block = if function.output.rule == MarshalingRule::Unit {
             "".into()
         } else {
             format!(
@@ -60,7 +54,7 @@ impl TargetCodeWriter for JniWriter {
                     final riko.Returned<{}> result = riko.Marshaler.decode(returned);
                     return result.unwrap();
                 "#,
-                return_type_result
+                return_type_public
             )
         };
         let args = function
@@ -73,9 +67,15 @@ impl TargetCodeWriter for JniWriter {
             .inputs
             .iter()
             .enumerate()
-            .map(|(idx, input)| format!("final {} arg_{}", target_type(&input.rule), idx))
+            .map(|(idx, input)| {
+                format!(
+                    "final {} arg_{}",
+                    target_type(input.rule, &input.unwrapped_type.0),
+                    idx
+                )
+            })
             .join(", ");
-        let return_type_bridge = if function.output.is_none() {
+        let return_type_bridge = if function.output.rule == MarshalingRule::Unit {
             "void"
         } else {
             "byte[]"
@@ -137,22 +137,21 @@ impl TargetCodeWriter for JniWriter {
         }
 
         // Block that calls the original function
-        let result_block_invocation = match &function.output {
-            Some(output) => {
-                let output_type = output.rust_type();
-                quote! {
-                    let result = #full_public_name(
-                        #(#result_args),*
-                    );
-                    let returned: ::riko_runtime::returned::Returned<#output_type> = ::std::convert::Into::into(result);
-                    ::riko_runtime::Marshaled::to_jni(&returned, &_env)
-                }
+        let result_block_invocation = if function.output.rule == MarshalingRule::Unit {
+            quote! { #full_public_name(#(#result_args),*) }
+        } else {
+            let output_type = function.output.marshaled_type();
+            quote! {
+                let result = #full_public_name(
+                    #(#result_args),*
+                );
+                let returned: ::riko_runtime::returned::Returned<#output_type> = ::std::convert::Into::into(result);
+                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
             }
-            None => quote! { #full_public_name(#(#result_args),*) },
         };
 
         // Return type of the generated function
-        let result_output = if function.output.is_none() {
+        let result_output = if function.output.rule == MarshalingRule::Unit {
             TokenStream::default()
         } else {
             quote! { -> ::jni::sys::jbyteArray }
@@ -199,14 +198,17 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type(rule: &MarshalingRule) -> String {
+fn target_type(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
     match rule {
         MarshalingRule::Bool => "java.lang.Boolean".into(),
         MarshalingRule::Bytes => "byte[]".into(),
         MarshalingRule::I8 => "java.lang.Byte".into(),
         MarshalingRule::I32 => "java.lang.Integer".into(),
         MarshalingRule::I64 => "java.lang.Long".into(),
-        MarshalingRule::Struct(inner) => inner.to_token_stream().to_string().replace("::", "."),
+        MarshalingRule::Struct => unwrapped_type
+            .to_token_stream()
+            .to_string()
+            .replace("::", "."),
         MarshalingRule::String => "java.lang.String".into(),
         MarshalingRule::Unit => "void".into(),
     }
@@ -240,6 +242,7 @@ fn full_function_name(name: &str, module: &[String]) -> syn::Path {
 mod tests {
     use super::*;
     use crate::ir::*;
+    use crate::parse::*;
 
     #[test]
     fn full_function_name() {
@@ -311,7 +314,7 @@ mod tests {
                 functions: vec![Function {
                     name: "function".into(),
                     inputs: vec![],
-                    output: None,
+                    output: Default::default(),
                     pubname: "function".into(),
                     cfg: Default::default(),
                 }],
@@ -336,7 +339,7 @@ mod tests {
                 functions: vec![Function {
                     name: "function".into(),
                     inputs: vec![],
-                    output: None,
+                    output: Default::default(),
                     pubname: "function".into(),
                     cfg: Default::default(),
                 }],
@@ -376,7 +379,7 @@ mod tests {
                 functions: vec![Function {
                     name: "function_ffi".into(),
                     inputs: vec![],
-                    output: None,
+                    output: Default::default(),
                     pubname: "function".into(),
                     cfg: Default::default(),
                 }],
@@ -401,7 +404,7 @@ mod tests {
                 functions: vec![Function {
                     name: "function_ffi".into(),
                     inputs: vec![],
-                    output: None,
+                    output: Default::default(),
                     pubname: "function".into(),
                     cfg: Default::default(),
                 }],
@@ -456,13 +459,20 @@ mod tests {
                         Input {
                             rule: MarshalingRule::I32,
                             borrow: true,
+                            unwrapped_type: Assertable(syn::parse_quote! { i32 }),
                         },
                         Input {
                             rule: MarshalingRule::I64,
                             borrow: false,
+                            unwrapped_type: Assertable(syn::parse_quote! { i64 }),
                         },
                     ],
-                    output: Some(MarshalingRule::String),
+                    output: Output {
+                        rule: MarshalingRule::String,
+                        result: false,
+                        option: false,
+                        unwrapped_type: Assertable(syn::parse_quote! { String }),
+                    },
                     cfg: Default::default(),
                 }],
                 path: vec!["example".into()],
@@ -490,13 +500,20 @@ mod tests {
                         Input {
                             rule: MarshalingRule::I32,
                             borrow: true,
+                            unwrapped_type: Assertable(syn::parse_quote! { i32 }),
                         },
                         Input {
                             rule: MarshalingRule::I64,
                             borrow: false,
+                            unwrapped_type: Assertable(syn::parse_quote! { i64 }),
                         },
                     ],
-                    output: Some(MarshalingRule::String),
+                    output: Output {
+                        rule: MarshalingRule::String,
+                        result: false,
+                        option: false,
+                        unwrapped_type: Assertable(syn::parse_quote! { String }),
+                    },
                     cfg: Default::default(),
                 }],
                 path: vec!["util".into()],

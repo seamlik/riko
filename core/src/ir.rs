@@ -5,14 +5,13 @@
 
 use crate::parse::Args;
 use crate::parse::Assertable;
-use crate::parse::Expanded;
 use crate::parse::Fun;
 use crate::parse::Marshal;
-use crate::parse::MarshalingRule;
 use crate::ErrorSource;
 use quote::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
+use strum_macros::*;
 use syn::AttrStyle;
 use syn::Attribute;
 use syn::FnArg;
@@ -21,6 +20,7 @@ use syn::ItemFn;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Meta;
+use syn::ReturnType;
 use syn::Type;
 
 fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
@@ -65,6 +65,102 @@ fn extract_cfg(src: impl Iterator<Item = Attribute>) -> Vec<Assertable<Attribute
             Assertable(attr)
         })
         .collect()
+}
+
+/// Specifies how to marshal the arguments and the returned value of a function across the FFI.
+///
+/// For now, the rules are a bit limiting (no unsigned integers, for example). This is
+/// because we only want to make sure they work with all target languages (Java does not have
+/// unsigned integers, for example).
+///
+/// # Errors and Nullness
+///
+/// Unless specified, most of the rules work with their corresponding Rust types being wrapped
+/// inside an [Option]. In the return position, wrapping the type in a [Result]
+/// is also supported.
+///
+/// # References and Borrowed Types
+///
+/// Because the data is copied between FFI boundary and thus is always owned, support for references
+/// and borrwoed types are limited.
+///
+/// References are supported For function parameters. However, the borrowed version of an owned type
+/// is not supported (e.g. `&String` works but `&str` doesn't).
+///
+/// For returned types, only owned types are supported.
+///
+/// # Inference
+///
+/// Since procedural macros can only analyse a syntax tree and have no access to any type
+/// information, it is impossible to always acurrately infer the rule. If the inference causes
+/// compiler errors or a type alias is used, specify the rule explicitly.
+///
+/// If no other rules match the inference, `Struct` will be chosen by default.
+///
+/// # Result and Option
+///
+/// All rules support the underlying type wrapped inside either a [Result], an [Option] or a
+/// `Result<Option<T>, E>`. No other combinations are supported.
+#[derive(PartialEq, Debug, EnumString, Clone, Copy)]
+pub enum MarshalingRule {
+    /// [bool].
+    Bool,
+
+    /// Marshals specifically a byte array instead of a collection of [u8].
+    ///
+    /// Only `ByteBuf` from [serde_bytes](https://crates.io/crates/serde_bytes) is supported for
+    /// this rule.
+    Bytes,
+
+    /// [i8].
+    I8,
+
+    /// [i32].
+    I32,
+
+    /// [i64].
+    I64,
+
+    /// Custom types that support serialzation through [Serde](https://serde.rs).
+    ///
+    /// This rule requires the type in the function signature be fully qualified.
+    Struct,
+
+    /// [String].
+    String,
+
+    /// `()`.
+    Unit,
+}
+
+impl MarshalingRule {
+    fn infer(t: &syn::Path) -> Self {
+        fn matches(candidate: &'static [&'static str], raw: &str) -> bool {
+            raw == *candidate.last().unwrap()
+                || raw == candidate[1..].join(" :: ")
+                || raw == candidate.join(" :: ").trim()
+        }
+
+        let type_path_str = t.segments.to_token_stream().to_string();
+
+        if "bool" == type_path_str {
+            Self::Bool
+        } else if "i32" == type_path_str {
+            Self::I32
+        } else if "i64" == type_path_str {
+            Self::I64
+        } else if "i8" == type_path_str {
+            Self::I8
+        } else if type_path_str.trim().is_empty() {
+            Self::Unit
+        } else if matches(&["", "std", "string", "String"], &type_path_str) {
+            Self::String
+        } else if matches(&["", "serde_bytes", "ByteBuf"], &type_path_str) {
+            Self::Bytes
+        } else {
+            Self::Struct
+        }
+    }
 }
 
 /// Crate.
@@ -150,7 +246,6 @@ impl Module {
             match item {
                 Item::Fn(inner) => {
                     if let Some(args) = Fun::take_from(inner.attrs.iter()).map_err(conv_err)? {
-                        let args = args.expand_all_fields(&inner.sig).map_err(conv_err)?;
                         functions.push(Function::parse(inner, args).map_err(conv_err)?);
                     }
                 }
@@ -244,7 +339,7 @@ impl Module {
 pub struct Function {
     pub inputs: Vec<Input>,
     pub name: String,
-    pub output: Option<MarshalingRule>,
+    pub output: Output,
     pub cfg: Vec<Assertable<Attribute>>,
 
     /// Public name exported to the target side.
@@ -253,7 +348,7 @@ pub struct Function {
 
 impl Function {
     /// Parses an [ItemFn].
-    fn parse(item: ItemFn, args: Fun<Expanded>) -> syn::Result<Self> {
+    fn parse(item: ItemFn, args: Fun) -> syn::Result<Self> {
         let name = item.sig.ident.to_string();
 
         Ok(Self {
@@ -269,7 +364,7 @@ impl Function {
                 args.name
             },
             name,
-            output: args.marshal,
+            output: Output::parse(&item.sig.output, args.marshal)?,
             cfg: extract_cfg(item.attrs.into_iter()),
         })
     }
@@ -294,33 +389,133 @@ pub struct Input {
     pub rule: MarshalingRule,
     /// If the parameter accepts a reference.
     pub borrow: bool,
+
+    /// The actual type wrapped inside a [Result] or an [Option].
+    pub unwrapped_type: Assertable<syn::Path>,
 }
 
 impl Input {
     fn parse(item: &FnArg) -> syn::Result<Self> {
         match item {
             FnArg::Typed(typed) => {
+                let (borrow, sig_type) = if let Type::Reference(inner) = &*typed.ty {
+                    (true, crate::util::assert_type_is_path(&inner.elem)?)
+                } else {
+                    (false, crate::util::assert_type_is_path(&*typed.ty)?)
+                };
+                let (_, _, unwrapped_type) = crate::util::unwrap_result_option(&sig_type)?;
                 let rule = if let Some(args) = Marshal::take_from(typed.attrs.iter())? {
                     args.value
                 } else {
-                    MarshalingRule::infer(&typed.ty)?
+                    MarshalingRule::infer(&unwrapped_type)
                 };
 
-                let borrow = if let Type::Reference(_) = *typed.ty {
-                    true
-                } else {
-                    false
-                };
-
-                Ok(Self { rule, borrow })
+                Ok(Self {
+                    rule,
+                    borrow,
+                    unwrapped_type: Assertable(unwrapped_type),
+                })
             }
             FnArg::Receiver(_) => todo!("`#[fun]` on a method not implemented"),
         }
     }
 }
 
+/// Function return type.
+#[derive(Debug, PartialEq)]
+pub struct Output {
+    pub rule: MarshalingRule,
+
+    /// If the function returns an [Option].
+    pub option: bool,
+
+    /// If the function returns a [Result].
+    pub result: bool,
+
+    /// The actual type wrapped inside a [Result] or an [Option].
+    pub unwrapped_type: Assertable<syn::Path>,
+}
+
+impl Output {
+    fn parse(sig: &ReturnType, rule_hint: Option<MarshalingRule>) -> syn::Result<Self> {
+        let sig_type = match sig {
+            ReturnType::Default => syn::Path {
+                leading_colon: None,
+                segments: Default::default(),
+            },
+            ReturnType::Type(_, ty) => crate::util::assert_type_is_path(&*ty)?,
+        };
+        let (result, option, unwrapped_type) = crate::util::unwrap_result_option(&sig_type)?;
+        let rule = if let Some(inner) = rule_hint {
+            inner
+        } else {
+            MarshalingRule::infer(&unwrapped_type)
+        };
+
+        Ok(Self {
+            rule,
+            option,
+            result,
+            unwrapped_type: Assertable(unwrapped_type),
+        })
+    }
+
+    /// The type to use in the bridge code as `Returned<#marshaled_type>`.
+    pub fn marshaled_type(&self) -> syn::Path {
+        match self.rule {
+            MarshalingRule::Bool => syn::parse_quote! { bool },
+            MarshalingRule::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
+            MarshalingRule::I8 => syn::parse_quote! { i8 },
+            MarshalingRule::I32 => syn::parse_quote! { i32 },
+            MarshalingRule::I64 => syn::parse_quote! { i64 },
+            MarshalingRule::Struct => self.unwrapped_type.0.clone(),
+            MarshalingRule::String => syn::parse_quote! { ::std::string::String },
+            MarshalingRule::Unit => syn::parse_quote! { () },
+        }
+    }
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Self {
+            rule: MarshalingRule::Unit,
+            result: false,
+            option: false,
+            unwrapped_type: Assertable(syn::Path {
+                leading_colon: None,
+                segments: Default::default(),
+            }),
+        }
+    }
+}
+
+#[allow(non_snake_case)]
 mod test {
     use super::*;
+
+    #[test]
+    fn MarshalingRule_infer() {
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { ByteBuf }),
+            MarshalingRule::Bytes
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { String }),
+            MarshalingRule::String
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { std::string::String }),
+            MarshalingRule::String
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { ::std::string::String }),
+            MarshalingRule::String
+        );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { bool }),
+            MarshalingRule::Bool
+        );
+    }
 
     #[test]
     fn function() {
@@ -333,11 +528,7 @@ mod test {
                 unimplemented!()
             }
         };
-        let args = Fun::take_from(function.attrs.iter())
-            .unwrap()
-            .unwrap()
-            .expand_all_fields(&function.sig)
-            .unwrap();
+        let args = Fun::take_from(function.attrs.iter()).unwrap().unwrap();
 
         let expected = Function {
             name: "function".into(),
@@ -345,13 +536,15 @@ mod test {
                 Input {
                     rule: MarshalingRule::Bool,
                     borrow: false,
+                    unwrapped_type: Assertable(syn::parse_quote! { bool }),
                 },
                 Input {
                     rule: MarshalingRule::Bytes,
                     borrow: true,
+                    unwrapped_type: Assertable(syn::parse_quote! { String }),
                 },
             ],
-            output: Some(MarshalingRule::I32),
+            output: Output::parse(&function.sig.output, args.marshal).unwrap(),
             pubname: "function2".into(),
             cfg: Default::default(),
         };
@@ -367,6 +560,7 @@ mod test {
                 #[riko::marshal = "String"] b: usize,
                 c: &ByteBuf,
                 #[riko::marshal = "I32"] d: &Vec<u8>,
+                e: crate::Love,
             ) {
                 unimplemented!()
             }
@@ -375,18 +569,27 @@ mod test {
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
+                unwrapped_type: Assertable(syn::parse_quote! { String }),
             },
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
+                unwrapped_type: Assertable(syn::parse_quote! { usize }),
             },
             Input {
                 rule: MarshalingRule::Bytes,
                 borrow: true,
+                unwrapped_type: Assertable(syn::parse_quote! { ByteBuf }),
             },
             Input {
                 rule: MarshalingRule::I32,
                 borrow: true,
+                unwrapped_type: Assertable(syn::parse_quote! { Vec<u8> }),
+            },
+            Input {
+                rule: MarshalingRule::Struct,
+                borrow: false,
+                unwrapped_type: Assertable(syn::parse_quote! { crate::Love }),
             },
         ];
         let actual = function

@@ -7,6 +7,7 @@
 pub mod ir;
 pub mod jni;
 pub mod parse;
+pub(crate) mod util;
 
 use ir::Crate;
 use ir::Function;
