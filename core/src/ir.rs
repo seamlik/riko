@@ -4,11 +4,13 @@
 //! contain the information sufficient for generating target code.
 
 use crate::parse::Args;
-use crate::parse::Assertable;
 use crate::parse::Fun;
 use crate::parse::Marshal;
 use crate::ErrorSource;
+use proc_macro2::TokenStream;
 use quote::ToTokens;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::path::Path;
 use std::path::PathBuf;
 use strum_macros::*;
@@ -66,6 +68,39 @@ fn extract_cfg(src: impl Iterator<Item = Attribute>) -> Vec<Assertable<Attribute
             Assertable(attr)
         })
         .collect()
+}
+
+/// Wraps a [syn] type for unit tests.
+///
+/// Most [syn] types don't implement [Debug] or [PartialEq] which makes them unable to be used in
+/// [assert_eq]. This type fixes the problem.
+pub struct Assertable<T>(pub T);
+
+impl<T> AsRef<T> for Assertable<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: ToTokens> Debug for Assertable<T> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.0.to_token_stream().to_string())
+    }
+}
+
+impl<T: ToTokens> PartialEq for Assertable<T> {
+    fn eq(&self, other: &Self) -> bool {
+        fn to_string<T: ToTokens>(a: &T) -> String {
+            a.to_token_stream().to_string()
+        }
+        to_string(&self.0) == to_string(&other.0)
+    }
+}
+
+impl<T: ToTokens> ToTokens for Assertable<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens)
+    }
 }
 
 /// Specifies how to marshal the arguments and the returned value of a function across the FFI.

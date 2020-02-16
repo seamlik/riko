@@ -1,11 +1,9 @@
 //! Syntax tree parsing.
 
 use crate::ir::MarshalingRule;
-use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::convert::TryFrom;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
@@ -135,39 +133,6 @@ impl Parse for Fun {
             .into_iter()
             .collect();
         Self::try_from(args)
-    }
-}
-
-/// Wraps a [syn] type for unit tests.
-///
-/// Most [syn] types don't implement [Debug] or [PartialEq] which makes them unable to be used in
-/// [assert_eq]. This type fixes the problem.
-pub struct Assertable<T>(pub T);
-
-impl<T> AsRef<T> for Assertable<T> {
-    fn as_ref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: ToTokens> Debug for Assertable<T> {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.0.to_token_stream().to_string())
-    }
-}
-
-impl<T: ToTokens> PartialEq for Assertable<T> {
-    fn eq(&self, other: &Self) -> bool {
-        fn to_string<T: ToTokens>(a: &T) -> String {
-            a.to_token_stream().to_string()
-        }
-        to_string(&self.0) == to_string(&other.0)
-    }
-}
-
-impl<T: ToTokens> ToTokens for Assertable<T> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens)
     }
 }
 
