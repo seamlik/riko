@@ -10,11 +10,11 @@ use serde::Serialize;
 pub mod object;
 pub mod returned;
 
-/// Object marshaled between the FFI boundry.
+/// Data marshaled between the FFI boundry.
 ///
 /// The marshaling strategy is to utilize [Serde](https://serde.rs). The object will be serialized
 /// into [CBOR](https://cbor.io) byte array and sent between the FFI boundary.
-pub trait Marshaled: Serialize + DeserializeOwned {
+pub trait Marshal: Serialize + DeserializeOwned {
     fn to_jni(&self, env: &JNIEnv) -> jbyteArray {
         let output = serde_cbor::to_vec(self).expect("Failed to marshal the object");
         env.byte_array_from_slice(&output)
@@ -30,4 +30,4 @@ pub trait Marshaled: Serialize + DeserializeOwned {
 }
 
 /// All data types that supports Serde automatically implement this trait.
-impl<T: Serialize + DeserializeOwned> Marshaled for T {}
+impl<T: Serialize + DeserializeOwned> Marshal for T {}

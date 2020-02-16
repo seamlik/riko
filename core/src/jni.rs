@@ -115,7 +115,7 @@ impl TargetCodeWriter for JniWriter {
 
             // Arguments
             let arg_raw = quote! {
-                ::riko_runtime::Marshaled::from_jni(&_env, #param_name)
+                ::riko_runtime::Marshal::from_jni(&_env, #param_name)
             };
             let arg = if input.borrow {
                 quote! { &(#arg_raw) }
@@ -138,7 +138,7 @@ impl TargetCodeWriter for JniWriter {
                     #(#result_args),*
                 );
                 let result: ::riko_runtime::returned::Returned<#output_type> = result.into();
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
         };
         result
@@ -345,7 +345,7 @@ mod tests {
             ) -> ::jni::sys::jbyteArray {
                 let result = crate::util::function_ffi();
                 let result: ::riko_runtime::returned::Returned<()> = result.into();
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
         }
         .to_string();
@@ -458,11 +458,11 @@ mod tests {
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
                 let result = crate::util::function(
-                    &(::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni)),
-                    ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
+                    &(::riko_runtime::Marshal::from_jni(&_env, arg_0_jni)),
+                    ::riko_runtime::Marshal::from_jni(&_env, arg_1_jni)
                 );
                 let result: ::riko_runtime::returned::Returned<::std::string::String> = result.into();
-                ::riko_runtime::Marshaled::to_jni(&result, &_env)
+                ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
         }
         .to_string();
