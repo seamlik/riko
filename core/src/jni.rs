@@ -40,23 +40,14 @@ impl TargetCodeWriter for JniWriter {
 
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
         let return_type_public =
-            target_type(function.output.rule, &function.output.unwrapped_type.0);
-        let return_prefix = if function.output.rule == MarshalingRule::Unit {
-            ""
-        } else {
-            "final byte[] returned ="
-        };
+            target_type_public(function.output.rule, &function.output.unwrapped_type.0);
+
         let return_block = if function.output.rule == MarshalingRule::Unit {
-            "".into()
+            "result.unwrap();"
         } else {
-            format!(
-                r#"
-                    final riko.Returned<{}> result = riko.Marshaler.decode(returned);
-                    return result.unwrap();
-                "#,
-                return_type_public
-            )
+            "return result.unwrap();"
         };
+
         let args = function
             .inputs
             .iter()
@@ -70,16 +61,11 @@ impl TargetCodeWriter for JniWriter {
             .map(|(idx, input)| {
                 format!(
                     "final {} arg_{}",
-                    target_type(input.rule, &input.unwrapped_type.0),
+                    target_type_public(input.rule, &input.unwrapped_type.0),
                     idx
                 )
             })
             .join(", ");
-        let return_type_bridge = if function.output.rule == MarshalingRule::Unit {
-            "void"
-        } else {
-            "byte[]"
-        };
         let params_bridge = function
             .inputs
             .iter()
@@ -89,9 +75,10 @@ impl TargetCodeWriter for JniWriter {
 
         format!(
             r#"
-                private static native {return_type_bridge} __riko_{name}( {params_bridge} );
+                private static native byte[] __riko_{name}( {params_bridge} );
                 public static {return_type_public} {name}( {params_public} ) {{
-                    {return_prefix} __riko_{name}( {args} );
+                    final byte[] returned = __riko_{name}( {args} );
+                    final riko.Returned<{return_type_local}> result = riko.Marshaler.decode(returned);
                     {return_block}
                 }}
             "#,
@@ -100,13 +87,15 @@ impl TargetCodeWriter for JniWriter {
             params_bridge = params_bridge,
             params_public = params_public,
             return_block = return_block,
-            return_prefix = return_prefix,
-            return_type_bridge = return_type_bridge,
+            return_type_local =
+                target_type_local(function.output.rule, &function.output.unwrapped_type.0),
             return_type_public = return_type_public,
         )
     }
 
     fn write_bridge_function(&self, function: &Function, module: &Module, root: &Crate) -> ItemFn {
+        let output_type = function.output.marshaled_type();
+
         // Name of the generated function
         let full_public_name = full_function_name(&function.name, &module.path);
         let mangled_name = mangle_function_name(&function.pubname, &module.path, &root.name);
@@ -136,35 +125,20 @@ impl TargetCodeWriter for JniWriter {
             result_args.push(arg);
         }
 
-        // Block that calls the original function
-        let result_block_invocation = if function.output.rule == MarshalingRule::Unit {
-            quote! { #full_public_name(#(#result_args),*) }
-        } else {
-            let output_type = function.output.marshaled_type();
-            quote! {
-                let result = #full_public_name(
-                    #(#result_args),*
-                );
-                let returned: ::riko_runtime::returned::Returned<#output_type> = ::std::convert::Into::into(result);
-                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
-            }
-        };
-
-        // Return type of the generated function
-        let result_output = if function.output.rule == MarshalingRule::Unit {
-            TokenStream::default()
-        } else {
-            quote! { -> ::jni::sys::jbyteArray }
-        };
-
         // Inherited `#[cfg]`
         let cfg = function.collect_cfg(module, root);
 
         let result: ItemFn = syn::parse_quote! {
             #(#cfg)*
             #[no_mangle]
-            pub extern "C" fn #mangled_name(#(#result_params),*) #result_output {
-                #result_block_invocation
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
+            pub extern "C" fn #mangled_name(#(#result_params),*) -> ::jni::sys::jbyteArray {
+                let result = #full_public_name(
+                    #(#result_args),*
+                );
+                let result: ::riko_runtime::returned::Returned<#output_type> = result.into();
+                ::riko_runtime::Marshaled::to_jni(&result, &_env)
             }
         };
         result
@@ -198,7 +172,7 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
+fn target_type_public(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
     match rule {
         MarshalingRule::Bool => "java.lang.Boolean".into(),
         MarshalingRule::Bytes => "byte[]".into(),
@@ -211,6 +185,14 @@ fn target_type(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
             .replace("::", "."),
         MarshalingRule::String => "java.lang.String".into(),
         MarshalingRule::Unit => "void".into(),
+    }
+}
+
+/// To use in `riko.Returned<#target_type_local>`.
+fn target_type_local(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
+    match rule {
+        MarshalingRule::Unit => "java.lang.Object".into(),
+        _ => target_type_public(rule, unwrapped_type),
     }
 }
 
@@ -301,76 +283,13 @@ mod tests {
     }
 
     #[test]
-    fn function_nothing_target() {
-        let expected = r#"
-            private static native void __riko_function( );
-            public static void function( ) {
-                __riko_function( );
-            }
-        "#;
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function".into(),
-                    inputs: vec![],
-                    output: Default::default(),
-                    pubname: "function".into(),
-                    cfg: Default::default(),
-                }],
-                path: vec!["example".into()],
-                cfg: Default::default(),
-            }],
-        };
-        let actual =
-            JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
-
-        assert_eq!(
-            crate::normalize_source_code(expected),
-            crate::normalize_source_code(&actual),
-        );
-    }
-
-    #[test]
-    fn function_nothing_bridge() {
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function".into(),
-                    inputs: vec![],
-                    output: Default::default(),
-                    pubname: "function".into(),
-                    cfg: Default::default(),
-                }],
-                path: vec!["util".into()],
-                cfg: Default::default(),
-            }],
-        };
-        let actual = JniWriter
-            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
-            .into_token_stream()
-            .to_string();
-        let expected = quote! {
-            #[no_mangle]
-            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
-                _env: ::jni::JNIEnv,
-                _class: ::jni::objects::JClass
-            ) {
-                crate::util::function()
-            }
-        }
-        .to_string();
-
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
     fn function_rename_target() {
         let expected = r#"
-            private static native void __riko_function( );
+            private static native byte[] __riko_function( );
             public static void function( ) {
-                __riko_function( );
+                final byte[] returned = __riko_function( );
+                final riko.Returned<java.lang.Object> result = riko.Marshaler.decode(returned);
+                result.unwrap();
             }
         "#;
         let ir = Crate {
@@ -418,11 +337,15 @@ mod tests {
             .to_string();
         let expected = quote! {
             #[no_mangle]
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
             pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass
-            ) {
-                crate::util::function_ffi()
+            ) -> ::jni::sys::jbyteArray {
+                let result = crate::util::function_ffi();
+                let result: ::riko_runtime::returned::Returned<()> = result.into();
+                ::riko_runtime::Marshaled::to_jni(&result, &_env)
             }
         }
         .to_string();
@@ -526,6 +449,8 @@ mod tests {
             .to_string();
         let expected = quote! {
             #[no_mangle]
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
             pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass,
@@ -536,8 +461,8 @@ mod tests {
                     &(::riko_runtime::Marshaled::from_jni(&_env, arg_0_jni)),
                     ::riko_runtime::Marshaled::from_jni(&_env, arg_1_jni)
                 );
-                let returned: ::riko_runtime::returned::Returned<::std::string::String> = ::std::convert::Into::into(result);
-                ::riko_runtime::Marshaled::to_jni(&returned, &_env)
+                let result: ::riko_runtime::returned::Returned<::std::string::String> = result.into();
+                ::riko_runtime::Marshaled::to_jni(&result, &_env)
             }
         }
         .to_string();

@@ -22,6 +22,7 @@ use syn::Lit;
 use syn::Meta;
 use syn::ReturnType;
 use syn::Type;
+use syn::TypePath;
 
 fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
     if let Some(attr) = module_child
@@ -461,14 +462,17 @@ impl Output {
     }
 
     /// The type to use in the bridge code as `Returned<#marshaled_type>`.
-    pub fn marshaled_type(&self) -> syn::Path {
+    pub fn marshaled_type(&self) -> Type {
         match self.rule {
             MarshalingRule::Bool => syn::parse_quote! { bool },
             MarshalingRule::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
             MarshalingRule::I8 => syn::parse_quote! { i8 },
             MarshalingRule::I32 => syn::parse_quote! { i32 },
             MarshalingRule::I64 => syn::parse_quote! { i64 },
-            MarshalingRule::Struct => self.unwrapped_type.0.clone(),
+            MarshalingRule::Struct => Type::Path(TypePath {
+                qself: None,
+                path: self.unwrapped_type.0.clone(),
+            }),
             MarshalingRule::String => syn::parse_quote! { ::std::string::String },
             MarshalingRule::Unit => syn::parse_quote! { () },
         }
