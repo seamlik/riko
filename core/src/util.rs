@@ -23,10 +23,7 @@ pub fn unwrap_result_option(ty: &syn::Path) -> syn::Result<(bool, bool, Path)> {
                     Ok((true, false, first_segment_arg))
                 }
             } else {
-                Err(syn::Error::new_spanned(
-                    ty,
-                    "Expect the type for a `Result`",
-                ))
+                Ok((true, false, first_segment_arg))
             }
         } else {
             Ok((false, false, ty.clone()))
@@ -133,6 +130,13 @@ mod test {
         let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
         assert_eq!(
             (true, true, "bool".into()),
+            (result, option, unwrapped.to_token_stream().to_string())
+        );
+
+        let item: Path = syn::parse_quote! { Result<(), Error> };
+        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
+        assert_eq!(
+            (true, false, "".into()),
             (result, option, unwrapped.to_token_stream().to_string())
         );
     }

@@ -515,6 +515,10 @@ mod test {
             MarshalingRule::infer(&syn::parse_quote! { bool }),
             MarshalingRule::Bool
         );
+        assert_eq!(
+            MarshalingRule::infer(&syn::parse_quote! { crate::Love }),
+            MarshalingRule::Struct
+        );
     }
 
     #[test]
@@ -554,52 +558,89 @@ mod test {
 
     #[test]
     fn input() {
-        let function: ItemFn = syn::parse_quote! {
-            pub fn function(
-                a: String,
-                #[riko::marshal = "String"] b: usize,
-                c: &ByteBuf,
-                #[riko::marshal = "I32"] d: &Vec<u8>,
-                e: crate::Love,
-            ) {
-                unimplemented!()
-            }
-        };
-        let expected = vec![
+        assert_eq!(
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
                 unwrapped_type: Assertable(syn::parse_quote! { String }),
             },
+            Input::parse(&syn::parse_quote! { a: String }).unwrap(),
+        );
+        assert_eq!(
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
                 unwrapped_type: Assertable(syn::parse_quote! { usize }),
             },
+            Input::parse(&syn::parse_quote! { #[riko::marshal = "String"] b: usize }).unwrap(),
+        );
+        assert_eq!(
             Input {
                 rule: MarshalingRule::Bytes,
                 borrow: true,
                 unwrapped_type: Assertable(syn::parse_quote! { ByteBuf }),
             },
+            Input::parse(&syn::parse_quote! { c: &ByteBuf }).unwrap(),
+        );
+        assert_eq!(
             Input {
                 rule: MarshalingRule::I32,
                 borrow: true,
                 unwrapped_type: Assertable(syn::parse_quote! { Vec<u8> }),
             },
+            Input::parse(&syn::parse_quote! { #[riko::marshal = "I32"] d: &Vec<u8> }).unwrap(),
+        );
+        assert_eq!(
             Input {
-                rule: MarshalingRule::Struct,
+                rule: MarshalingRule::String,
                 borrow: false,
-                unwrapped_type: Assertable(syn::parse_quote! { crate::Love }),
+                unwrapped_type: Assertable(syn::parse_quote! { String }),
             },
-        ];
-        let actual = function
-            .sig
-            .inputs
-            .iter()
-            .map(Input::parse)
-            .collect::<syn::Result<Vec<Input>>>()
-            .unwrap();
-        assert_eq!(expected, actual)
+            Input::parse(&syn::parse_quote! { a: String }).unwrap(),
+        );
+    }
+
+    #[test]
+    fn output() {
+        assert_eq!(
+            Output {
+                rule: MarshalingRule::Bool,
+                result: false,
+                option: false,
+                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+            },
+            Output::parse(&syn::parse_quote! { -> bool }, None).unwrap(),
+        );
+        assert_eq!(
+            Output {
+                rule: MarshalingRule::I32,
+                result: false,
+                option: false,
+                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+            },
+            Output::parse(&syn::parse_quote! { -> bool }, Some(MarshalingRule::I32)).unwrap(),
+        );
+        assert_eq!(
+            Output {
+                rule: MarshalingRule::I32,
+                result: true,
+                option: true,
+                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+            },
+            Output::parse(
+                &syn::parse_quote! { -> Result<Option<bool>, Error> },
+                Some(MarshalingRule::I32)
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            Output::default(),
+            Output::parse(&syn::parse_quote! { -> () }, None).unwrap(),
+        );
+        assert_eq!(
+            Output::default(),
+            Output::parse(&syn::parse_quote! {}, None).unwrap(),
+        );
     }
 
     #[test]
