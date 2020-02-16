@@ -6,8 +6,6 @@ package riko;
 public abstract class Object implements AutoCloseable {
 
   protected final int handle;
-  private boolean freed = false;
-  private boolean consumed = false;
 
   protected Object(final int handle) {
     this.handle = handle;
@@ -15,35 +13,14 @@ public abstract class Object implements AutoCloseable {
 
   @Override
   public void close() {
-    if (!freed) {
-      drop();
-      freed = true;
-      consumed = true;
-    }
+    drop(handle);
   }
 
-  /**
-   * De-allocates the object on the Rust side. Should be implemented by calling a corresponding
-   * native method.
-   */
-  protected abstract void drop();
+  private static native void drop(int handle);
 
-  /**
-   * Checks if the object is still alive on the Rust side. This method should be used at the
-   * beginning of every instance method that requires a live Rust object on the heap.
-   *
-   * @throws AssertionError If the object is not alive.
-   */
-  protected void assertAlive() {
-    assert !freed : "Attempt of use after free.";
-    assert !consumed : "Attempt to manipulate the object after it's consumed!";
-  }
+  private static native boolean aliveNative(int handle);
 
-  /**
-   * Marks the object as consumed.
-   */
-  protected void consume() {
-    assertAlive();
-    consumed = true;
+  public boolean alive() {
+    return aliveNative(handle);
   }
 }

@@ -102,6 +102,14 @@ impl Pool {
     pub const fn new() -> Lazy<Self> {
         Lazy::new(Default::default)
     }
+
+    /// Checks if the object pointed by `handle` is alive.
+    pub fn alive(&self, handle: Handle) -> bool {
+        self.pool
+            .read()
+            .expect("Failed to write-lock the pool")
+            .contains_key(&handle)
+    }
 }
 
 impl Default for Pool {
@@ -111,4 +119,24 @@ impl Default for Pool {
             counter: 0.into(),
         }
     }
+}
+
+#[cfg(feature = "riko_jni")]
+#[no_mangle]
+pub extern "C" fn Java_riko_Object_drop(
+    _: ::jni::JNIEnv,
+    _: ::jni::objects::JClass,
+    handle: Handle,
+) {
+    POOL.drop(handle);
+}
+
+#[cfg(feature = "riko_jni")]
+#[no_mangle]
+pub extern "C" fn Java_riko_Object_aliveNative(
+    _: ::jni::JNIEnv,
+    _: ::jni::objects::JClass,
+    handle: Handle,
+) -> bool {
+    POOL.alive(handle)
 }

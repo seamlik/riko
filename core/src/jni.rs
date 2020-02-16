@@ -42,10 +42,10 @@ impl TargetCodeWriter for JniWriter {
         let return_type_public =
             target_type_public(function.output.rule, &function.output.unwrapped_type.0);
 
-        let return_block = if function.output.rule == MarshalingRule::Unit {
-            "result.unwrap();"
-        } else {
-            "return result.unwrap();"
+        let return_block = match function.output.rule {
+            MarshalingRule::Unit => "result.unwrap();",
+            MarshalingRule::Any => "return new riko.Any(result.unwrap());",
+            _ => "return result.unwrap();",
         };
 
         let args = function
@@ -125,6 +125,21 @@ impl TargetCodeWriter for JniWriter {
             result_args.push(arg);
         }
 
+        // Shelving heap-allocated objects
+        let shelve = if function.output.rule == MarshalingRule::Any {
+            let method = match (function.output.result, function.output.option) {
+                (false, false) => quote::format_ident!("shelve_self"),
+                (false, true) => quote::format_ident!("shelve_option"),
+                (true, false) => quote::format_ident!("shelve_result"),
+                (true, true) => quote::format_ident!("shelve_result_option"),
+            };
+            quote! {
+                let result = ::riko_runtime::object::Object::#method(result);
+            }
+        } else {
+            Default::default()
+        };
+
         // Inherited `#[cfg]`
         let cfg = function.collect_cfg(module, root);
 
@@ -137,6 +152,7 @@ impl TargetCodeWriter for JniWriter {
                 let result = #full_public_name(
                     #(#result_args),*
                 );
+                #shelve
                 let result: ::riko_runtime::returned::Returned<#output_type> = result.into();
                 ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
@@ -174,6 +190,7 @@ impl TargetCodeWriter for JniWriter {
 
 fn target_type_public(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
     match rule {
+        MarshalingRule::Any => "riko.Any".into(),
         MarshalingRule::Bool => "java.lang.Boolean".into(),
         MarshalingRule::Bytes => "byte[]".into(),
         MarshalingRule::I8 => "java.lang.Byte".into(),
@@ -191,6 +208,7 @@ fn target_type_public(rule: MarshalingRule, unwrapped_type: &syn::Path) -> Strin
 /// To use in `riko.Returned<#target_type_local>`.
 fn target_type_local(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
     match rule {
+        MarshalingRule::Any => "java.lang.Integer".into(),
         MarshalingRule::Unit => "java.lang.Object".into(),
         _ => target_type_public(rule, unwrapped_type),
     }
