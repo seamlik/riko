@@ -1,0 +1,11 @@
+sourceSets {
+  main {
+    java {
+      srcDirs "${rootDir}/target/riko/jni"
+    }
+  }
+}
+
+dependencies {
+  implementation project(':riko-runtime-jni')
+}

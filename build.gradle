@@ -1,0 +1,19 @@
+subprojects {
+  apply plugin: 'java-library'
+
+  group = 'riko'
+  java.sourceCompatibility = JavaVersion.VERSION_1_8
+
+  repositories {
+    jcenter()
+  }
+
+  dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.6.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.0'
+  }
+
+  test {
+    useJUnitPlatform()
+  }
+}

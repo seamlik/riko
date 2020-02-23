@@ -1,9 +1,12 @@
 *.bk
 *.iml
 .classpath
+.gradle/
 .idea/
 .project
 .settings
+/gradle/wrapper/
+/gradlew*
 Cargo.lock
 build/
 out/

@@ -1,0 +1,7 @@
+include ':riko-runtime-jni'
+include ':riko-sample-jni'
+
+rootProject.name = 'riko'
+rootProject.children.each { project ->
+  project.projectDir = new File(rootDir, project.name.replace('riko-', ''))
+}
