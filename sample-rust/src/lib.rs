@@ -2,7 +2,7 @@
 mod bridge;
 
 mod object;
-//mod serde;
+mod structs;
 
 use serde_bytes::ByteBuf;
 

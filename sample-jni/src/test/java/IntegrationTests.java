@@ -2,6 +2,9 @@ import java.nio.file.Paths;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import riko.Any;
+import riko_sample.structs.Life;
+import riko_sample.structs.Love;
+import riko_sample.structs.Work;
 
 class IntegrationTests {
   static {
@@ -63,5 +66,15 @@ class IntegrationTests {
     Assertions.assertTrue(result.alive());
     result.close();
     Assertions.assertFalse(result.alive());
+  }
+
+  @Test
+  void structs() {
+    final Love love = new Love();
+    love.target = "Her";
+    final Work work = new Work();
+    work.salary = 10000;
+    final Life life = riko_sample.structs.Module.structs(love, work);
+    Assertions.assertTrue(life.happy);
   }
 }
