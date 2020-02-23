@@ -38,9 +38,12 @@ impl TargetCodeWriter for JniWriter {
         Ok(())
     }
 
-    fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
-        let return_type_public =
-            target_type_public(function.output.rule, &function.output.unwrapped_type.0);
+    fn write_target_function(&self, function: &Function, _: &Module, crate_: &Crate) -> String {
+        let return_type_public = target_type_public(
+            function.output.rule,
+            &function.output.unwrapped_type.0,
+            &crate_.name,
+        );
 
         let return_block = match function.output.rule {
             MarshalingRule::Unit => "result.unwrap();",
@@ -61,7 +64,7 @@ impl TargetCodeWriter for JniWriter {
             .map(|(idx, input)| {
                 format!(
                     "final {} arg_{}",
-                    target_type_public(input.rule, &input.unwrapped_type.0),
+                    target_type_public(input.rule, &input.unwrapped_type.0, &crate_.name),
                     idx
                 )
             })
@@ -87,8 +90,11 @@ impl TargetCodeWriter for JniWriter {
             params_bridge = params_bridge,
             params_public = params_public,
             return_block = return_block,
-            return_type_local =
-                target_type_local(function.output.rule, &function.output.unwrapped_type.0),
+            return_type_local = target_type_local(
+                function.output.rule,
+                &function.output.unwrapped_type.0,
+                &crate_.name
+            ),
             return_type_public = return_type_public,
         )
     }
@@ -189,7 +195,11 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type_public(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
+fn target_type_public(
+    rule: MarshalingRule,
+    unwrapped_type: &syn::Path,
+    crate_name: &str,
+) -> String {
     match rule {
         MarshalingRule::Any => "riko.Any".into(),
         MarshalingRule::Bool => "java.lang.Boolean".into(),
@@ -197,21 +207,30 @@ fn target_type_public(rule: MarshalingRule, unwrapped_type: &syn::Path) -> Strin
         MarshalingRule::I8 => "java.lang.Byte".into(),
         MarshalingRule::I32 => "java.lang.Integer".into(),
         MarshalingRule::I64 => "java.lang.Long".into(),
-        MarshalingRule::Struct => unwrapped_type
-            .to_token_stream()
-            .to_string()
-            .replace("::", "."),
+        MarshalingRule::Struct => {
+            let mut result = unwrapped_type
+                .segments
+                .iter()
+                .map(|i| i.to_token_stream().to_string())
+                .collect::<Vec<_>>();
+            if let Some(first) = result.first_mut() {
+                if first == "crate" {
+                    *first = crate_name.into();
+                }
+            }
+            result.join(".")
+        }
         MarshalingRule::String => "java.lang.String".into(),
         MarshalingRule::Unit => "void".into(),
     }
 }
 
 /// To use in `riko.Returned<#target_type_local>`.
-fn target_type_local(rule: MarshalingRule, unwrapped_type: &syn::Path) -> String {
+fn target_type_local(rule: MarshalingRule, unwrapped_type: &syn::Path, crate_name: &str) -> String {
     match rule {
         MarshalingRule::Any => "java.lang.Integer".into(),
         MarshalingRule::Unit => "java.lang.Object".into(),
-        _ => target_type_public(rule, unwrapped_type),
+        _ => target_type_public(rule, unwrapped_type, crate_name),
     }
 }
 
