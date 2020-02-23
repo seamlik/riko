@@ -46,9 +46,9 @@ impl TargetCodeWriter for JniWriter {
         );
 
         let return_block = match function.output.rule {
-            MarshalingRule::Unit => "result.unwrap();",
-            MarshalingRule::Any => "return new riko.Any(result.unwrap());",
-            _ => "return result.unwrap();",
+            MarshalingRule::Unit => "",
+            MarshalingRule::Any => "return new riko.Any(result);",
+            _ => "return result;",
         };
 
         let args = function
@@ -78,12 +78,15 @@ impl TargetCodeWriter for JniWriter {
 
         format!(
             r#"
-                private static native byte[] __riko_{name}( {params_bridge} );
-                public static {return_type_public} {name}( {params_public} ) {{
-                    final byte[] returned = __riko_{name}( {args} );
-                    final riko.Returned<{return_type_local}> result = riko.Marshaler.decode(returned);
-                    {return_block}
-                }}
+              private static native byte[] __riko_{name}( {params_bridge} );
+              public static {return_type_public} {name}( {params_public} ) {{
+                final byte[] returned = __riko_{name}( {args} );
+                final {return_type_local} result = riko
+                    .Marshaler
+                    .decode(returned)
+                    .unwrap({return_type_local}.class);
+                {return_block}
+              }}
             "#,
             args = args,
             name = &function.pubname,
@@ -325,9 +328,11 @@ mod tests {
         let expected = r#"
             private static native byte[] __riko_function( );
             public static void function( ) {
-                final byte[] returned = __riko_function( );
-                final riko.Returned<java.lang.Object> result = riko.Marshaler.decode(returned);
-                result.unwrap();
+              final byte[] returned = __riko_function( );
+              final java.lang.Object result = riko
+                .Marshaler
+                .decode(returned)
+                .unwrap(java.lang.Object.class);
             }
         "#;
         let ir = Crate {
@@ -407,8 +412,11 @@ mod tests {
                     riko.Marshaler.encode(arg_0),
                     riko.Marshaler.encode(arg_1)
                 );
-                final riko.Returned<java.lang.String> result = riko.Marshaler.decode(returned);
-                return result.unwrap();
+                final java.lang.String result = riko
+                  .Marshaler
+                  .decode(returned)
+                  .unwrap(java.lang.String.class);
+                return result;
             }
         "#;
         let ir = Crate {
