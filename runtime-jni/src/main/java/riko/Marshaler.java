@@ -8,6 +8,8 @@ import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
  * Marshals objects between the Rust side and the JNI side.
  */
 public class Marshaler {
+  private Marshaler() {}
+
   private static final ObjectMapper MAPPER = new ObjectMapper(new CBORFactory());
 
   /**
