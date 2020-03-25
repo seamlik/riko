@@ -8,8 +8,6 @@
 
 #![feature(const_fn)]
 
-use ::jni::sys::jbyteArray;
-use ::jni::JNIEnv;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -21,13 +19,15 @@ pub mod returned;
 /// The marshaling strategy is to utilize [Serde](https://serde.rs). The object will be serialized
 /// into [CBOR](https://cbor.io) byte array and sent between the FFI boundary.
 pub trait Marshal: Serialize + DeserializeOwned {
-    fn to_jni(&self, env: &JNIEnv) -> jbyteArray {
+    #[cfg(feature = "riko_jni")]
+    fn to_jni(&self, env: &::jni::JNIEnv) -> ::jni::sys::jbyteArray {
         let output = serde_cbor::to_vec(self).expect("Failed to marshal the object");
         env.byte_array_from_slice(&output)
             .expect("Failed to send the marshaled data to JNI")
     }
 
-    fn from_jni(env: &JNIEnv, src: jbyteArray) -> Self {
+    #[cfg(feature = "riko_jni")]
+    fn from_jni(env: &::jni::JNIEnv, src: ::jni::sys::jbyteArray) -> Self {
         let input = env
             .convert_byte_array(src)
             .expect("Failed to receive a byte array from JNI");
