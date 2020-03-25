@@ -2,8 +2,6 @@
 
 #![feature(drain_filter)]
 
-extern crate proc_macro;
-
 mod expand;
 
 use proc_macro::TokenStream;
