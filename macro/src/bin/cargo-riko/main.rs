@@ -13,6 +13,10 @@ pub fn main() -> anyhow::Result<()> {
             );
             continue;
         }
+
+        // Remove all generated code first because they interfere with the IR scanning
+        let _ = std::fs::remove_dir_all(&config.cached.output_directory);
+
         riko_core::bindgen(
             &Crate::parse(&config.cached.entry, config.cached.crate_name.clone())?,
             &config.cached.output_directory,
