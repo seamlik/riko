@@ -3,6 +3,7 @@
 //! These types are generated after parsing a Rust source file containing Riko attributes. They
 //! contain the information sufficient for generating target code.
 
+#[cfg(test)]
 pub(crate) mod samples;
 
 use crate::parse::Args;
@@ -550,6 +551,7 @@ impl Default for Output {
     }
 }
 
+#[cfg(test)]
 #[allow(non_snake_case)]
 mod test {
     use super::*;

@@ -260,6 +260,7 @@ fn full_function_name(name: &str, module: &[String]) -> syn::Path {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

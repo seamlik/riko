@@ -16,7 +16,6 @@ use ir::Function;
 use ir::Module;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use regex::Regex;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::error::Error as StdError;
@@ -181,7 +180,8 @@ pub enum ErrorSource {
     Riko(#[source] syn::Error),
 }
 
+#[cfg(test)]
 fn normalize_source_code(code: &str) -> String {
-    let regex = r"\s+".parse::<Regex>().unwrap();
+    let regex = r"\s+".parse::<regex::Regex>().unwrap();
     code.replace(&regex, " ")
 }

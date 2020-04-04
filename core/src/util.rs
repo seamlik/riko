@@ -81,6 +81,7 @@ pub fn assert_lit_is_litstr(src: &Lit) -> syn::Result<&LitStr> {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
     use quote::ToTokens;

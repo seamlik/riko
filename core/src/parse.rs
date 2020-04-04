@@ -136,6 +136,7 @@ impl Parse for Fun {
     }
 }
 
+#[cfg(test)]
 #[allow(non_snake_case)]
 mod tests {
     use super::*;

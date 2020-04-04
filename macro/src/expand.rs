@@ -17,6 +17,7 @@ pub fn remove_marshal_attrs(function: &mut ItemFn) {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
