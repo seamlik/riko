@@ -1,7 +1,6 @@
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import riko.Any;
 import riko_sample.structs.Life;
 import riko_sample.structs.Love;
 import riko_sample.structs.Work;
@@ -58,14 +57,6 @@ class IntegrationTests {
   @Test
   void bool() {
     Assertions.assertEquals(false, riko_sample.Module._bool(false, true));
-  }
-
-  @Test
-  void any() {
-    final Any result = riko_sample.object.Module.create_reactor();
-    Assertions.assertTrue(result.alive());
-    result.close();
-    Assertions.assertFalse(result.alive());
   }
 
   @Test

@@ -16,36 +16,39 @@ use std::sync::RwLock;
 /// These objects are allocated and freed on the Rust side while only expose a reference to the
 /// target side. Target code must integrate the manual memory management into its own mechanism as
 /// those memory management strategy (usually garbage collection) is not aware of any native code.
-pub trait Object: Any + Sized + Send {
-    /// Shelves an object into [POOL].
-    fn shelve_self(self) -> Returned<Handle> {
+pub trait Object: Send + Sync + Any {}
+
+/// Shelves an [Object] into [POOL].
+pub trait Shelve: Sized {
+    /// Shelves it.
+    fn shelve(self) -> Returned<Handle>;
+}
+
+impl<T: Object> Shelve for T {
+    fn shelve(self) -> Returned<Handle> {
         POOL.store(self).into()
     }
+}
 
-    /// Shelves an object in a [Result].
-    fn shelve_result<E: Error>(src: Result<Self, E>) -> Returned<Handle> {
-        match src {
-            Ok(obj) => obj.shelve_self(),
-            Err(err) => Returned {
-                error: Some(err.into()),
-                value: None,
-            },
-        }
+impl<T: Object> Shelve for Arc<T> {
+    fn shelve(self) -> Returned<Handle> {
+        POOL.store(self.clone()).into()
     }
+}
 
-    /// Shelves an optional object.
-    fn shelve_option(src: Option<Self>) -> Returned<Handle> {
-        match src {
-            Some(obj) => obj.shelve_self(),
+impl<T: Object> Shelve for Option<T> {
+    fn shelve(self) -> Returned<Handle> {
+        match self {
+            Some(obj) => obj.shelve(),
             None => Default::default(),
         }
     }
+}
 
-    /// Shelves an optional object in a [Result].
-    fn shelve_result_option<E: Error>(src: Result<Option<Self>, E>) -> Returned<Handle> {
-        match src {
-            Ok(Some(obj)) => obj.shelve_self(),
-            Ok(None) => Default::default(),
+impl<T: Object, E: Error> Shelve for Result<T, E> {
+    fn shelve(self) -> Returned<Handle> {
+        match self {
+            Ok(obj) => obj.shelve(),
             Err(err) => Returned {
                 error: Some(err.into()),
                 value: None,
@@ -53,8 +56,6 @@ pub trait Object: Any + Sized + Send {
         }
     }
 }
-
-impl<T: Any + Sized + Send> Object for T {}
 
 /// Opaque handle pointing to a [Object].
 pub type Handle = i32;

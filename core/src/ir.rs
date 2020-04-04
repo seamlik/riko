@@ -134,7 +134,7 @@ impl<T: ToTokens> ToTokens for Assertable<T> {
 /// information, it is impossible to always acurrately infer the rule. If the inference causes
 /// compiler errors or a type alias is used, specify the rule explicitly.
 ///
-/// If no other rules match the inference, [Any](MarshalingRule::Any) will be chosen by default.
+/// If no other rules match the inference, [Struct](MarshalingRule::Struct) will be chosen by default.
 ///
 /// # Result and Option
 ///
@@ -160,12 +160,8 @@ pub enum MarshalingRule {
     /// [i64].
     I64,
 
-    /// Opaque handle pointing to an [Any](std::any::Any).
-    ///
-    /// The data will be stored in a global pool.
-    ///
-    /// This rule is useful for e.g. handling types from a third-party crate that does not use Riko.
-    Any,
+    /// Heap-allocated data.
+    Object,
 
     /// Custom types that support serialzation through [Serde](https://serde.rs).
     ///
@@ -204,7 +200,7 @@ impl MarshalingRule {
         } else if matches(&["", "serde_bytes", "ByteBuf"], &type_path_str) {
             Self::Bytes
         } else {
-            Self::Any
+            Self::Struct
         }
     }
 }
@@ -521,7 +517,7 @@ impl Output {
     /// The type to use in the bridge code as `Returned<#marshaled_type>`.
     pub fn marshaled_type(&self) -> Type {
         match self.rule {
-            MarshalingRule::Any => syn::parse_quote! { i32 },
+            MarshalingRule::Object => syn::parse_quote! { ::riko_runtime::object::Handle },
             MarshalingRule::Bool => syn::parse_quote! { bool },
             MarshalingRule::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
             MarshalingRule::I8 => syn::parse_quote! { i8 },
@@ -580,7 +576,7 @@ mod test {
         );
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { crate::Love }),
-            MarshalingRule::Any
+            MarshalingRule::Struct
         );
     }
 

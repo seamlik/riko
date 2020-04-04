@@ -44,9 +44,9 @@ impl TargetCodeWriter for JniWriter {
         );
 
         let return_block = match function.output.rule {
-            MarshalingRule::Unit => "",
-            MarshalingRule::Any => "return new riko.Any(result);",
-            _ => "return result;",
+            MarshalingRule::Unit => "".into(),
+            MarshalingRule::Object => format!("return new {}(result);", &return_type_public),
+            _ => "return result;".into(),
         };
 
         let args = function
@@ -133,15 +133,9 @@ impl TargetCodeWriter for JniWriter {
         }
 
         // Shelving heap-allocated objects
-        let shelve = if function.output.rule == MarshalingRule::Any {
-            let method = match (function.output.result, function.output.option) {
-                (false, false) => quote::format_ident!("shelve_self"),
-                (false, true) => quote::format_ident!("shelve_option"),
-                (true, false) => quote::format_ident!("shelve_result"),
-                (true, true) => quote::format_ident!("shelve_result_option"),
-            };
+        let shelve = if function.output.rule == MarshalingRule::Object {
             quote! {
-                let result = ::riko_runtime::object::Object::#method(result);
+                let result = ::riko_runtime::object::Shelve::shelve(result);
             }
         } else {
             Default::default()
@@ -202,13 +196,12 @@ fn target_type_public(
     crate_name: &str,
 ) -> String {
     match rule {
-        MarshalingRule::Any => "riko.Any".into(),
         MarshalingRule::Bool => "java.lang.Boolean".into(),
         MarshalingRule::Bytes => "byte[]".into(),
         MarshalingRule::I8 => "java.lang.Byte".into(),
         MarshalingRule::I32 => "java.lang.Integer".into(),
         MarshalingRule::I64 => "java.lang.Long".into(),
-        MarshalingRule::Struct => {
+        MarshalingRule::Object | MarshalingRule::Struct => {
             let mut result = unwrapped_type
                 .segments
                 .iter()
@@ -229,7 +222,7 @@ fn target_type_public(
 /// To use in `riko.Returned<#target_type_local>`.
 fn target_type_local(rule: MarshalingRule, unwrapped_type: &syn::Path, crate_name: &str) -> String {
     match rule {
-        MarshalingRule::Any => "java.lang.Integer".into(),
+        MarshalingRule::Object => "java.lang.Integer".into(),
         MarshalingRule::Unit => "java.lang.Object".into(),
         _ => target_type_public(rule, unwrapped_type, crate_name),
     }
@@ -314,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn function() {
+    fn simple_function() {
         let ir = crate::ir::samples::simple_function();
 
         let expected = r#"
@@ -360,6 +353,54 @@ mod tests {
                     ::riko_runtime::Marshal::from_jni(&_env, arg_1_jni)
                 );
                 let result: ::riko_runtime::returned::Returned<::std::string::String> = result.into();
+                ::riko_runtime::Marshal::to_jni(&result, &_env)
+            }
+        }
+        .to_string();
+        let actual = JniWriter
+            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
+            .into_token_stream()
+            .to_string();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn returning_object() {
+        let ir = crate::ir::samples::returning_object();
+
+        let expected = r#"
+            private static native byte[] __riko_function(
+            );
+            public static riko_sample.Love function(
+            ) {
+                final byte[] returned = __riko_function(
+                );
+                final java.lang.Integer result = riko
+                  .Marshaler
+                  .decode(returned)
+                  .unwrap(java.lang.Integer.class);
+                return new riko_sample.Love(result);
+            }
+        "#;
+        let actual =
+            JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+        assert_eq!(
+            crate::normalize_source_code(expected),
+            crate::normalize_source_code(&actual),
+        );
+
+        let expected = quote! {
+            #[no_mangle]
+            #[allow(clippy::identity_conversion)]
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
+            pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
+                _env: ::jni::JNIEnv,
+                _class: ::jni::objects::JClass
+            ) -> ::jni::sys::jbyteArray {
+                let result = crate::example::function();
+                let result = ::riko_runtime::object::Shelve::shelve(result);
+                let result: ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> = result.into();
                 ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
         }

@@ -45,3 +45,25 @@ pub fn simple_function() -> Crate {
         }],
     }
 }
+
+pub fn returning_object() -> Crate {
+    Crate {
+        name: "riko_sample".into(),
+        modules: vec![Module {
+            functions: vec![Function {
+                name: "function".into(),
+                pubname: "function".into(),
+                inputs: vec![],
+                output: Output {
+                    rule: MarshalingRule::Object,
+                    result: false,
+                    option: false,
+                    unwrapped_type: Assertable(syn::parse_quote! { crate::Love }),
+                },
+                cfg: vec![],
+            }],
+            path: vec!["example".into()],
+            cfg: vec![],
+        }],
+    }
+}
