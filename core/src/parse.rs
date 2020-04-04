@@ -20,7 +20,7 @@ pub trait Args: Sized {
     /// Full name of the attribute.
     const NAME: &'static [&'static str];
 
-    /// Finds the first attribute that corresponds to this type and parses it.
+    /// Looks for the first attribute that corresponds to this type and parses it.
     fn take_from<'a>(mut attrs: impl Iterator<Item = &'a Attribute>) -> syn::Result<Option<Self>> {
         let eq = |attr: &Attribute| {
             attr.path
