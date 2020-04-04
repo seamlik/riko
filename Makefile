@@ -4,7 +4,7 @@ build:
 	cargo build
 	gradle assemble
 
-test: build
+verify: build
 	cargo fmt
 	cargo test
 	gradle check
