@@ -3,6 +3,8 @@
 //! These types are generated after parsing a Rust source file containing Riko attributes. They
 //! contain the information sufficient for generating target code.
 
+pub(crate) mod samples;
+
 use crate::parse::Args;
 use crate::parse::Fun;
 use crate::parse::Marshal;

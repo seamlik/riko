@@ -264,8 +264,6 @@ fn full_function_name(name: &str, module: &[String]) -> syn::Path {
 
 mod tests {
     use super::*;
-    use crate::ir::*;
-    use crate::parse::*;
 
     #[test]
     fn full_function_name() {
@@ -300,7 +298,8 @@ mod tests {
     }
 
     #[test]
-    fn module_nothing() {
+    fn module() {
+        let ir = &crate::ir::samples::empty_module();
         let expected = r#"
             package riko_sample.example;
 
@@ -308,14 +307,6 @@ mod tests {
                 private Module() {}
             }
         "#;
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![],
-                path: vec!["example".into()],
-                cfg: Default::default(),
-            }],
-        };
         let actual = JniWriter.write_target_module(&ir.modules[0], &ir);
         assert_eq!(
             crate::normalize_source_code(expected),
@@ -324,81 +315,9 @@ mod tests {
     }
 
     #[test]
-    fn function_rename_target() {
-        let expected = r#"
-            private static native byte[] __riko_function( );
-            public static void function( ) {
-              final byte[] returned = __riko_function( );
-              final java.lang.Object result = riko
-                .Marshaler
-                .decode(returned)
-                .unwrap(java.lang.Object.class);
-            }
-        "#;
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function_ffi".into(),
-                    inputs: vec![],
-                    output: Default::default(),
-                    pubname: "function".into(),
-                    cfg: Default::default(),
-                }],
-                path: vec!["example".into()],
-                cfg: Default::default(),
-            }],
-        };
-        let actual =
-            JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+    fn function() {
+        let ir = crate::ir::samples::simple_function();
 
-        assert_eq!(
-            crate::normalize_source_code(expected),
-            crate::normalize_source_code(&actual),
-        );
-    }
-
-    #[test]
-    fn function_rename_bridge() {
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function_ffi".into(),
-                    inputs: vec![],
-                    output: Default::default(),
-                    pubname: "function".into(),
-                    cfg: Default::default(),
-                }],
-                path: vec!["util".into()],
-                cfg: Default::default(),
-            }],
-        };
-        let actual = JniWriter
-            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
-            .into_token_stream()
-            .to_string();
-        let expected = quote! {
-            #[no_mangle]
-            #[allow(clippy::identity_conversion)]
-            #[allow(clippy::let_unit_value)]
-            #[allow(clippy::unit_arg)]
-            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
-                _env: ::jni::JNIEnv,
-                _class: ::jni::objects::JClass
-            ) -> ::jni::sys::jbyteArray {
-                let result = crate::util::function_ffi();
-                let result: ::riko_runtime::returned::Returned<()> = result.into();
-                ::riko_runtime::Marshal::to_jni(&result, &_env)
-            }
-        }
-        .to_string();
-
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn function_simple_target() {
         let expected = r#"
             private static native byte[] __riko_function(
                 byte[] arg_0,
@@ -419,93 +338,25 @@ mod tests {
                 return result;
             }
         "#;
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function".into(),
-                    pubname: "function".into(),
-                    inputs: vec![
-                        Input {
-                            rule: MarshalingRule::I32,
-                            borrow: true,
-                            unwrapped_type: Assertable(syn::parse_quote! { i32 }),
-                        },
-                        Input {
-                            rule: MarshalingRule::I64,
-                            borrow: false,
-                            unwrapped_type: Assertable(syn::parse_quote! { i64 }),
-                        },
-                    ],
-                    output: Output {
-                        rule: MarshalingRule::String,
-                        result: false,
-                        option: false,
-                        unwrapped_type: Assertable(syn::parse_quote! { String }),
-                    },
-                    cfg: Default::default(),
-                }],
-                path: vec!["example".into()],
-                cfg: Default::default(),
-            }],
-        };
         let actual =
             JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
-
         assert_eq!(
             crate::normalize_source_code(expected),
             crate::normalize_source_code(&actual),
         );
-    }
 
-    #[test]
-    fn function_simple_bridge() {
-        let ir = Crate {
-            name: "riko_sample".into(),
-            modules: vec![Module {
-                functions: vec![Function {
-                    name: "function".into(),
-                    pubname: "function".into(),
-                    inputs: vec![
-                        Input {
-                            rule: MarshalingRule::I32,
-                            borrow: true,
-                            unwrapped_type: Assertable(syn::parse_quote! { i32 }),
-                        },
-                        Input {
-                            rule: MarshalingRule::I64,
-                            borrow: false,
-                            unwrapped_type: Assertable(syn::parse_quote! { i64 }),
-                        },
-                    ],
-                    output: Output {
-                        rule: MarshalingRule::String,
-                        result: false,
-                        option: false,
-                        unwrapped_type: Assertable(syn::parse_quote! { String }),
-                    },
-                    cfg: Default::default(),
-                }],
-                path: vec!["util".into()],
-                cfg: Default::default(),
-            }],
-        };
-        let actual = JniWriter
-            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
-            .into_token_stream()
-            .to_string();
         let expected = quote! {
             #[no_mangle]
             #[allow(clippy::identity_conversion)]
             #[allow(clippy::let_unit_value)]
             #[allow(clippy::unit_arg)]
-            pub extern "C" fn Java_riko_1sample_util_Module__1_1riko_1function(
+            pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
                 _env: ::jni::JNIEnv,
                 _class: ::jni::objects::JClass,
                 arg_0_jni: ::jni::sys::jbyteArray,
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
-                let result = crate::util::function(
+                let result = crate::example::function(
                     &(::riko_runtime::Marshal::from_jni(&_env, arg_0_jni)),
                     ::riko_runtime::Marshal::from_jni(&_env, arg_1_jni)
                 );
@@ -514,7 +365,10 @@ mod tests {
             }
         }
         .to_string();
-
+        let actual = JniWriter
+            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
+            .into_token_stream()
+            .to_string();
         assert_eq!(expected, actual);
     }
 }
