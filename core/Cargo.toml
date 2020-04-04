@@ -8,7 +8,9 @@ repository = "https://github.com/seamlik/riko"
 version = "0.0.1"
 
 [dependencies]
+async-std = { version = "1", features = ["attributes"] }
 itertools = "0"
+futures = "0.3.4"
 log = "0"
 proc-macro2 = { version = "1", features = ["span-locations"]}
 quote = "1"

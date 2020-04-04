@@ -9,6 +9,8 @@ pub mod jni;
 pub mod parse;
 pub(crate) mod util;
 
+use async_std::fs::File;
+use futures::prelude::*;
 use ir::Crate;
 use ir::Function;
 use ir::Module;
@@ -16,11 +18,10 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use regex::Regex;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fs::File;
-use std::io::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 use syn::ItemFn;
@@ -29,7 +30,7 @@ use thiserror::Error;
 /// Target code generation.
 pub trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
-    fn write_target_all(&self, ir: &Crate, output_directory: &Path) -> Result<(), Error>;
+    fn write_target_all(&self, ir: &Crate) -> HashMap<PathBuf, String>;
 
     /// Generates all bridge code.
     fn write_bridge_all(&self, root: &Crate) -> Result<TokenStream, Error> {
@@ -58,28 +59,26 @@ pub trait TargetCodeWriter {
 /// Creates a source file on the filesystem, overwrites any existing content, handles logging.
 ///
 /// Used by [TargetCodeWriter] implementations.
-fn open_file(path: &Path) -> std::io::Result<File> {
+async fn open_file(path: &Path) -> std::io::Result<File> {
     log::info!("Writing to `{}`", path.display());
-    std::fs::create_dir_all(path.parent().unwrap())?;
-    File::create(path)
+    async_std::fs::create_dir_all(path.parent().unwrap()).await?;
+    File::create(path).await
 }
 
 /// Writes a source file.
 ///
 /// The file will be created first, and all existing content will be erased.
-fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
+async fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
     log::info!("Writing to `{}`", path.display());
 
-    std::fs::create_dir_all(path.parent().unwrap())?;
+    async_std::fs::create_dir_all(path.parent().unwrap()).await?;
 
-    let mut file = File::create(path)?;
-    file.write_all(content.as_bytes())?;
-
-    Ok(())
+    let mut file = File::create(path).await?;
+    file.write_all(content.as_bytes()).await
 }
 
 /// Generates language bindings and writes to an output directory.
-pub fn bindgen<'a>(
+pub async fn bindgen<'a>(
     ir: &Crate,
     output_directory: &Path,
     targets: impl Iterator<Item = &'a String>,
@@ -89,19 +88,31 @@ pub fn bindgen<'a>(
         let mut target_output_directory = output_directory.to_owned();
         target_output_directory.push(target);
 
-        writer.write_target_all(&ir, &target_output_directory)?;
+        // TODO: Parallelize this
+        for (path, code) in writer.write_target_all(&ir).iter() {
+            let mut dst = target_output_directory.clone();
+            dst.extend(path.iter());
+            write_file(&dst, code).await.map_err(|err| Error {
+                file: dst,
+                source: ErrorSource::Write(err),
+            })?;
+        }
+
         bridge.extend(writer.write_bridge_all(&ir)?);
     }
 
     let mut bridge_path = output_directory.to_owned();
     bridge_path.push("bridge.rs");
 
-    let mut bridge_file = open_file(&bridge_path).map_err(|err| Error {
-        file: bridge_path.to_owned(),
-        source: ErrorSource::Write(err),
-    })?;
+    let mut bridge_file = open_file(&bridge_path)
+        .map_err(|err| Error {
+            file: bridge_path.to_owned(),
+            source: ErrorSource::Write(err),
+        })
+        .await?;
     bridge_file
         .write_all(bridge.to_string().as_bytes())
+        .await
         .map_err(|err| Error {
             file: bridge_path.to_owned(),
             source: ErrorSource::Write(err),

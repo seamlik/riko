@@ -4,13 +4,13 @@ use crate::ir::Crate;
 use crate::ir::Function;
 use crate::ir::MarshalingRule;
 use crate::ir::Module;
-use crate::ErrorSource;
 use crate::TargetCodeWriter;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use syn::Ident;
 use syn::ItemFn;
 
@@ -21,21 +21,19 @@ const PREFIX_FOR_NATIVE: &str = "__riko_";
 pub struct JniWriter;
 
 impl TargetCodeWriter for JniWriter {
-    fn write_target_all(&self, root: &Crate, output_directory: &Path) -> Result<(), crate::Error> {
-        for module in root.modules.iter() {
-            let mut file_path = output_directory.to_owned();
-            file_path.push(&root.name);
-            file_path.extend(module.path.iter());
-            file_path.push(format!("{}.java", CLASS_FOR_MODULE));
+    fn write_target_all(&self, root: &Crate) -> HashMap<PathBuf, String> {
+        root.modules
+            .iter()
+            .map(|module| {
+                let mut file_path = PathBuf::new();
+                file_path.push(&root.name);
+                file_path.extend(module.path.iter());
+                file_path.push(format!("{}.java", CLASS_FOR_MODULE));
 
-            crate::write_file(&file_path, &self.write_target_module(module, root)).map_err(
-                |err| crate::Error {
-                    file: file_path,
-                    source: ErrorSource::Write(err),
-                },
-            )?;
-        }
-        Ok(())
+                let target_code = self.write_target_module(module, root);
+                (file_path, target_code)
+            })
+            .collect()
     }
 
     fn write_target_function(&self, function: &Function, _: &Module, crate_: &Crate) -> String {
