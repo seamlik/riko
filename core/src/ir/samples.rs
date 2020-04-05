@@ -34,8 +34,6 @@ pub fn simple_function() -> Crate {
                 ],
                 output: Output {
                     rule: MarshalingRule::String,
-                    result: false,
-                    option: false,
                     unwrapped_type: Assertable(syn::parse_quote! { String }),
                 },
                 cfg: Default::default(),
@@ -56,8 +54,6 @@ pub fn returning_object() -> Crate {
                 inputs: vec![],
                 output: Output {
                     rule: MarshalingRule::Object,
-                    result: false,
-                    option: false,
                     unwrapped_type: Assertable(syn::parse_quote! { crate::Love }),
                 },
                 cfg: vec![],

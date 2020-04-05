@@ -480,12 +480,6 @@ impl Input {
 pub struct Output {
     pub rule: MarshalingRule,
 
-    /// If the function returns an [Option].
-    pub option: bool,
-
-    /// If the function returns a [Result].
-    pub result: bool,
-
     /// The actual type wrapped inside a [Result] or an [Option].
     pub unwrapped_type: Assertable<syn::Path>,
 }
@@ -508,8 +502,6 @@ impl Output {
 
         Ok(Self {
             rule,
-            option,
-            result,
             unwrapped_type: Assertable(unwrapped_type),
         })
     }
@@ -537,8 +529,6 @@ impl Default for Output {
     fn default() -> Self {
         Self {
             rule: MarshalingRule::Unit,
-            result: false,
-            option: false,
             unwrapped_type: Assertable(syn::Path {
                 leading_colon: None,
                 segments: Default::default(),
@@ -664,8 +654,6 @@ mod test {
         assert_eq!(
             Output {
                 rule: MarshalingRule::Bool,
-                result: false,
-                option: false,
                 unwrapped_type: Assertable(syn::parse_quote! { bool }),
             },
             Output::parse(&syn::parse_quote! { -> bool }, None).unwrap(),
@@ -673,8 +661,6 @@ mod test {
         assert_eq!(
             Output {
                 rule: MarshalingRule::I32,
-                result: false,
-                option: false,
                 unwrapped_type: Assertable(syn::parse_quote! { bool }),
             },
             Output::parse(&syn::parse_quote! { -> bool }, Some(MarshalingRule::I32)).unwrap(),
@@ -682,8 +668,6 @@ mod test {
         assert_eq!(
             Output {
                 rule: MarshalingRule::I32,
-                result: true,
-                option: true,
                 unwrapped_type: Assertable(syn::parse_quote! { bool }),
             },
             Output::parse(
