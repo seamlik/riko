@@ -5,54 +5,70 @@ use syn::Path;
 use syn::PathArguments;
 use syn::Type;
 
-/// Checks if a type is a [Result], if it's an [Option], and returns the inner type.
-pub fn unwrap_result_option(ty: &syn::Path) -> syn::Result<(bool, bool, Path)> {
-    if let Some(first_segment) = ty.segments.last() {
-        let first_segment_name = first_segment.ident.to_string();
-        let first_segment_arg = first_argument(&first_segment.arguments);
-        if first_segment_name == "Option" {
-            Ok((false, true, first_segment_arg?))
-        } else if first_segment_name == "Result" {
-            let first_segment_arg = first_segment_arg?;
-            if let Some(second_segment) = first_segment_arg.segments.last() {
-                let second_segment_name = second_segment.ident.to_string();
-                let second_segment_arg = first_argument(&second_segment.arguments);
-                if second_segment_name == "Option" {
-                    Ok((true, true, second_segment_arg?))
-                } else {
-                    Ok((true, false, first_segment_arg))
-                }
-            } else {
-                Ok((true, false, first_segment_arg))
-            }
-        } else {
-            Ok((false, false, ty.clone()))
-        }
-    } else {
-        let empty_type = syn::Path {
-            leading_colon: None,
-            segments: Default::default(),
-        };
-        Ok((false, false, empty_type))
+struct TypeLayerIter {
+    cursor: Option<Path>,
+}
+
+impl TypeLayerIter {
+    fn new(ty: Path) -> Self {
+        Self { cursor: Some(ty) }
     }
 }
 
-/// Gets the first generic argument.
-///
-/// E.g. `int` in `Option<int>`.
-fn first_argument(arg: &PathArguments) -> syn::Result<Path> {
-    if let PathArguments::AngleBracketed(inner) = arg {
-        if let Some(GenericArgument::Type(ty)) = inner.args.first() {
-            assert_type_is_path(&ty)
-        } else {
-            Err(syn::Error::new_spanned(inner, "Expect type argument"))
+impl Iterator for TypeLayerIter {
+    type Item = Path;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.cursor.clone() {
+            None => None,
+            Some(cursor) => match cursor.segments.last() {
+                None => {
+                    self.cursor = None;
+                    Some(Path {
+                        leading_colon: None,
+                        segments: Default::default(),
+                    })
+                }
+                Some(current) => {
+                    self.cursor = match &current.arguments {
+                        PathArguments::AngleBracketed(arg) => match arg.args.first() {
+                            None => None,
+                            Some(arg) => {
+                                if let GenericArgument::Type(ty) = arg {
+                                    if let Ok(ty) = assert_type_is_path(&ty) {
+                                        Some(ty)
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            }
+                        },
+                        _ => None,
+                    };
+                    Some(cursor.clone())
+                }
+            },
         }
-    } else {
-        Err(syn::Error::new_spanned(
-            arg,
-            "Expect a angle bracket surrounded token",
-        ))
     }
+}
+
+static WRAPPERS: &[&str] = &["Arc", "Option", "Result"];
+
+pub fn unwrap_type(ty: syn::Path) -> Path {
+    let default = Path {
+        leading_colon: None,
+        segments: Default::default(),
+    };
+    for layer in TypeLayerIter::new(ty) {
+        if let Some(last_segment) = layer.segments.last() {
+            if !WRAPPERS.contains(&last_segment.ident.to_string().as_str()) {
+                return layer;
+            }
+        }
+    }
+    default
 }
 
 pub fn assert_type_is_path(src: &Type) -> syn::Result<Path> {
@@ -87,58 +103,71 @@ mod test {
     use quote::ToTokens;
 
     #[test]
-    fn first_argument() {
-        let simple: Path = syn::parse_quote! { Option<bool> };
-        assert_eq!(
-            "bool",
-            super::first_argument(&simple.segments.first().unwrap().arguments)
-                .unwrap()
-                .to_token_stream()
-                .to_string()
-        );
+    fn type_layers() {
+        fn run(path: Path) -> Vec<String> {
+            TypeLayerIter::new(path)
+                .map(|t| {
+                    t.segments
+                        .last()
+                        .map(|segment| segment.ident.to_string())
+                        .unwrap_or_default()
+                })
+                .collect::<Vec<_>>()
+        }
 
-        let empty: Path = syn::parse_quote! { bool };
-        assert!(super::first_argument(&empty.segments.first().unwrap().arguments).is_err());
+        let expected = vec!["Option", "bool"];
+        let actual = run(syn::parse_quote! { Option<bool> });
+        assert_eq!(expected, actual);
 
-        let iter: Path = syn::parse_quote! { Iterator<Item = bool> };
-        assert!(super::first_argument(&iter.segments.first().unwrap().arguments).is_err());
+        let expected = vec!["Result", "bool"];
+        let actual = run(syn::parse_quote! { Result<bool, Error> });
+        assert_eq!(expected, actual);
+
+        let expected = vec!["Result", "Option", "bool"];
+        let actual = run(syn::parse_quote! { Result<Option<bool>, Error> });
+        assert_eq!(expected, actual);
+
+        let expected = vec!["Arc", "Result", "Option", "Love"];
+        let actual = run(syn::parse_quote! { std::sync::Arc<Result<Option<Love>>, anyhow::Error> });
+        assert_eq!(expected, actual);
+
+        let expected = vec!["Result", ""];
+        let actual = run(syn::parse_quote! { Result<(), Error> });
+        assert_eq!(expected, actual);
     }
 
     #[test]
-    fn unwrap_result_option() {
-        let item: Path = syn::parse_quote! { bool };
-        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
-        assert_eq!(
-            (false, false, "bool".into()),
-            (result, option, unwrapped.to_token_stream().to_string())
-        );
+    fn unwrap_type() {
+        fn run(path: Path) -> String {
+            super::unwrap_type(path).into_token_stream().to_string()
+        }
 
-        let item: Path = syn::parse_quote! { Option<bool> };
-        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
-        assert_eq!(
-            (false, true, "bool".into()),
-            (result, option, unwrapped.to_token_stream().to_string())
-        );
+        let expected = "bool";
+        let actual = run(syn::parse_quote! { Option<bool> });
+        assert_eq!(expected, actual);
 
-        let item: Path = syn::parse_quote! { Result<bool, Error> };
-        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
-        assert_eq!(
-            (true, false, "bool".into()),
-            (result, option, unwrapped.to_token_stream().to_string())
-        );
+        let expected = "bool";
+        let actual = run(syn::parse_quote! { Result<bool, Error> });
+        assert_eq!(expected, actual);
 
-        let item: Path = syn::parse_quote! { Result<Option<bool>, Error> };
-        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
-        assert_eq!(
-            (true, true, "bool".into()),
-            (result, option, unwrapped.to_token_stream().to_string())
-        );
+        let expected = "bool";
+        let actual = run(syn::parse_quote! { Result<Option<bool>, Error> });
+        assert_eq!(expected, actual);
 
-        let item: Path = syn::parse_quote! { Result<(), Error> };
-        let (result, option, unwrapped) = super::unwrap_result_option(&item).unwrap();
-        assert_eq!(
-            (true, false, "".into()),
-            (result, option, unwrapped.to_token_stream().to_string())
-        );
+        let expected = "Love";
+        let actual = run(syn::parse_quote! { std::sync::Arc<Result<Option<Love>>, anyhow::Error> });
+        assert_eq!(expected, actual);
+
+        let expected = "";
+        let actual = run(syn::parse_quote! { Result<(), Error> });
+        assert_eq!(expected, actual);
+
+        let expected = "Vec < u8 >";
+        let actual = run(syn::parse_quote! { Vec<u8> });
+        assert_eq!(expected, actual);
+
+        let expected = "Vec < u8 >";
+        let actual = run(syn::parse_quote! { Option<Vec<u8>> });
+        assert_eq!(expected, actual);
     }
 }

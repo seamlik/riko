@@ -452,12 +452,12 @@ impl Input {
     fn parse(item: &FnArg) -> syn::Result<Self> {
         match item {
             FnArg::Typed(typed) => {
-                let (borrow, sig_type) = if let Type::Reference(inner) = &*typed.ty {
+                let (borrow, original_type) = if let Type::Reference(inner) = &*typed.ty {
                     (true, crate::util::assert_type_is_path(&inner.elem)?)
                 } else {
                     (false, crate::util::assert_type_is_path(&*typed.ty)?)
                 };
-                let (_, _, unwrapped_type) = crate::util::unwrap_result_option(&sig_type)?;
+                let unwrapped_type = crate::util::unwrap_type(original_type);
                 let rule = if let Some(args) = Marshal::take_from(typed.attrs.iter())? {
                     args.value
                 } else {
@@ -486,14 +486,14 @@ pub struct Output {
 
 impl Output {
     fn parse(sig: &ReturnType, rule_hint: Option<MarshalingRule>) -> syn::Result<Self> {
-        let sig_type = match sig {
+        let original_type = match sig {
             ReturnType::Default => syn::Path {
                 leading_colon: None,
                 segments: Default::default(),
             },
             ReturnType::Type(_, ty) => crate::util::assert_type_is_path(&*ty)?,
         };
-        let (result, option, unwrapped_type) = crate::util::unwrap_result_option(&sig_type)?;
+        let unwrapped_type = crate::util::unwrap_type(original_type);
         let rule = if let Some(inner) = rule_hint {
             inner
         } else {
