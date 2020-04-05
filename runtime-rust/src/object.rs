@@ -19,7 +19,7 @@ use std::sync::RwLock;
 pub trait Object: Send + Sync + Any {}
 
 /// Shelves an [Object] into [POOL].
-pub trait Shelve: Sized {
+pub trait Shelve: Any + Send + Sync {
     /// Shelves it.
     fn shelve(self) -> Returned<Handle>;
 }
@@ -30,13 +30,13 @@ impl<T: Object> Shelve for T {
     }
 }
 
-impl<T: Object> Shelve for Arc<T> {
+impl<T: Shelve> Shelve for Arc<T> {
     fn shelve(self) -> Returned<Handle> {
-        POOL.store(self.clone()).into()
+        POOL.store(self).into()
     }
 }
 
-impl<T: Object> Shelve for Option<T> {
+impl<T: Shelve> Shelve for Option<T> {
     fn shelve(self) -> Returned<Handle> {
         match self {
             Some(obj) => obj.shelve(),
@@ -45,7 +45,11 @@ impl<T: Object> Shelve for Option<T> {
     }
 }
 
-impl<T: Object, E: Error> Shelve for Result<T, E> {
+impl<T, E> Shelve for Result<T, E>
+where
+    T: Shelve,
+    E: Error + Send + Sync + 'static,
+{
     fn shelve(self) -> Returned<Handle> {
         match self {
             Ok(obj) => obj.shelve(),
