@@ -14,7 +14,7 @@ public class Marshaler {
     try {
       return MAPPER.writeValueAsBytes(src);
     } catch (final Exception err) {
-      throw new RuntimeException("Failed to marshal object.", err);
+      throw new MarshalException(err);
     }
   }
 
@@ -23,7 +23,7 @@ public class Marshaler {
     try {
       return MAPPER.readValue(src, Returned.class);
     } catch (final Exception err) {
-      throw new RuntimeException("Failed to marshal object.", err);
+      throw new MarshalException(err);
     }
   }
 }
