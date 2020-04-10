@@ -9,10 +9,8 @@ import riko_sample.structs.Work;
 
 class IntegrationTests {
   static {
-    final String library = Paths
-        .get("..", "target", "debug", "libriko_sample.so")
-        .toAbsolutePath()
-        .toString();
+    final String library =
+        Paths.get("..", "target", "debug", "libriko_sample.so").toAbsolutePath().toString();
     System.load(library);
   }
 
@@ -50,9 +48,9 @@ class IntegrationTests {
 
   @Test
   void bytes() {
-    byte[] a = { 1, 2, 3 };
-    byte[] b = { 4, 5, 6 };
-    byte[] expected = { 1, 2, 3, 4, 5, 6 };
+    byte[] a = {1, 2, 3};
+    byte[] b = {4, 5, 6};
+    byte[] expected = {1, 2, 3, 4, 5, 6};
     Assertions.assertArrayEquals(expected, riko_sample.Module.bytes(a, b));
   }
 

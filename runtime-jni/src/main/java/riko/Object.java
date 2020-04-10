@@ -1,8 +1,6 @@
 package riko;
 
-/**
- * Rust object allocated on the heap.
- */
+/** Rust object allocated on the heap. */
 public abstract class Object implements AutoCloseable {
 
   protected final int handle;
