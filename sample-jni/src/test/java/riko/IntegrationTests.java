@@ -16,7 +16,7 @@ class IntegrationTests {
 
   @Test
   void nothing() {
-    riko_sample.Module.nothing();
+    Assertions.assertDoesNotThrow(riko_sample.Module::nothing);
   }
 
   @Test
@@ -26,7 +26,7 @@ class IntegrationTests {
 
   @Test
   void rename() {
-    riko_sample.Module.rename();
+    Assertions.assertDoesNotThrow(riko_sample.Module::rename);
   }
 
   @Test
