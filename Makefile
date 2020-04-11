@@ -5,6 +5,7 @@ build:
 	gradle assemble
 
 verify: build
+	cargo fmt -- --check
 	cargo test
 	gradle check
 
