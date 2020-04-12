@@ -1,4 +1,5 @@
 plugins {
+  id 'checkstyle'
   id 'com.diffplug.gradle.spotless' version '3.28.1'
   id 'maven-publish'
 }
@@ -15,6 +16,11 @@ publishing {
       }
     }
   }
+}
+
+checkstyle {
+  toolVersion = '8.31'
+  maxWarnings 0
 }
 
 spotless {
