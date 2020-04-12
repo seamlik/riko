@@ -19,6 +19,7 @@ publishing {
 
 spotless {
   java {
+    paddedCell()
     googleJavaFormat()
   }
 }
