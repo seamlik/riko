@@ -10,7 +10,11 @@ public class ReturnedException extends RuntimeException {
     this.error = src;
   }
 
-  /** Gets the debug info. The {@code Debug} trait is used to generate this info. */
+  /**
+   * Gets the debug info.
+   *
+   * <p>The {@code Debug} trait is used to generate this info.
+   */
   public String getDebug() {
     return error.debug;
   }
