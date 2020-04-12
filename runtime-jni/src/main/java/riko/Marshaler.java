@@ -7,12 +7,12 @@ import com.fasterxml.jackson.dataformat.cbor.databind.CBORMapper;
 public class Marshaler {
   private Marshaler() {}
 
-  public static final ObjectMapper MAPPER = new CBORMapper();
+  private static final ObjectMapper mapper = new CBORMapper();
 
   /** Serializes an object. */
   public static byte[] encode(final java.lang.Object src) {
     try {
-      return MAPPER.writeValueAsBytes(src);
+      return mapper.writeValueAsBytes(src);
     } catch (final Exception err) {
       throw new MarshalException(err);
     }
@@ -21,7 +21,7 @@ public class Marshaler {
   /** Deserializes an object. */
   public static Returned decode(final byte[] src) {
     try {
-      return MAPPER.readValue(src, Returned.class);
+      return mapper.readValue(src, Returned.class);
     } catch (final Exception err) {
       throw new MarshalException(err);
     }

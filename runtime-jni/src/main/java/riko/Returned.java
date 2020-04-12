@@ -1,10 +1,13 @@
 package riko;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Data returned from the Rust side. */
 public class Returned {
+  private static final ObjectMapper mapper = new ObjectMapper();
+
   @Nullable public Error error;
 
   @Nullable public JsonNode value;
@@ -22,7 +25,7 @@ public class Returned {
     if (error != null) {
       throw new ReturnedException(error);
     } else {
-      return Marshaler.MAPPER.convertValue(this.value, type);
+      return mapper.convertValue(this.value, type);
     }
   }
 }
