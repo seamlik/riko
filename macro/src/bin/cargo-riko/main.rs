@@ -7,9 +7,15 @@ use riko_core::ir::Crate;
 pub async fn main() -> anyhow::Result<()> {
     env_logger::init();
     for config in Config::read_all_configs()?.iter() {
-        if format!("{}", config.cached.entry.display()).is_empty() {
+        if let None = config.cached.entry.iter().next() {
             log::warn!(
-                "Package `{}` does not have a `cdylib` target, skipping.",
+                "Package `{}` does not have a `cdylib` or `lib` target, skipping…",
+                &config.cached.crate_name
+            );
+            continue;
+        } else if config.targets.is_empty() {
+            log::warn!(
+                "Package `{}` does not specify any Riko target, skipping…",
                 &config.cached.crate_name
             );
             continue;
