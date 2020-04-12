@@ -20,7 +20,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads the top-level `Cargo.toml` and reads the `Riko.toml` of all crates in the workspace.
+    /// Reads the top-level `Cargo.toml` of all crates in the workspace.
     pub fn read_all_configs() -> anyhow::Result<Vec<Config>> {
         let metadata = MetadataCommand::new().exec()?;
         let mut configs = Vec::new();
