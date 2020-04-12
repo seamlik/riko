@@ -1,4 +1,4 @@
-#[path = "../../target/riko/bridge.rs"]
+#[path = "../../target/riko/riko_sample.rs"]
 mod bridge;
 
 mod object;

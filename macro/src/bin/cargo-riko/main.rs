@@ -1,7 +1,6 @@
 mod config;
 
 use config::Config;
-use riko_core::ir::Crate;
 
 #[async_std::main]
 pub async fn main() -> anyhow::Result<()> {
@@ -21,11 +20,14 @@ pub async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        // Remove all generated code first because they interfere with the IR scanning
-        let _ = async_std::fs::remove_dir_all(&config.cached.output_directory).await;
-
+        log::info!(
+            "Generating language bindings for crate `{}` with entry `{}`",
+            &config.cached.crate_name,
+            config.cached.entry.display()
+        );
         riko_core::bindgen(
-            &Crate::parse(&config.cached.entry, config.cached.crate_name.clone()).await?,
+            &config.cached.crate_name,
+            &config.cached.entry,
             &config.cached.output_directory,
             config.targets.iter(),
         )

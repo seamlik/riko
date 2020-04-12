@@ -78,14 +78,34 @@ async fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
 
 /// Generates language bindings and writes to an output directory.
 pub async fn bindgen<'a>(
-    ir: &Crate,
+    crate_name: &str,
+    crate_entry: &Path,
     output_directory: &Path,
     targets: impl Iterator<Item = &'a String>,
 ) -> Result<(), Error> {
+    let mut bridge_path = output_directory.to_owned();
+    bridge_path.push(format!("{}.rs", crate_name));
+    // Delete the bridge code first because it interferes with the IR scanning
+    log::info!("Deleting bridge code: {}", bridge_path.display());
+    let _ = async_std::fs::remove_file(&bridge_path).await;
+
+    let ir = Crate::parse(crate_entry, crate_name.into()).await?;
     let mut bridge = TokenStream::default();
+
     for (target, writer) in create_target_code_writers(targets).into_iter() {
+        bridge.extend(writer.write_bridge_all(&ir)?);
+
         let mut target_output_directory = output_directory.to_owned();
         target_output_directory.push(target);
+
+        let mut target_output_directory_root = target_output_directory.clone();
+        target_output_directory_root.push(crate_name);
+        // Clear the target code first because the bindgen is append-only
+        log::info!(
+            "Deleting target code: {}",
+            target_output_directory_root.display()
+        );
+        let _ = async_std::fs::remove_dir_all(&target_output_directory_root).await;
 
         // TODO: Parallelize this
         for (path, code) in writer.write_target_all(&ir).iter() {
@@ -96,12 +116,7 @@ pub async fn bindgen<'a>(
                 source: ErrorSource::Write(err),
             })?;
         }
-
-        bridge.extend(writer.write_bridge_all(&ir)?);
     }
-
-    let mut bridge_path = output_directory.to_owned();
-    bridge_path.push("bridge.rs");
 
     let mut bridge_file = open_file(&bridge_path)
         .map_err(|err| Error {
