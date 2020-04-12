@@ -295,7 +295,7 @@ impl Module {
                 }
                 Item::Mod(inner) => {
                     // Blocks here because recursive async fn is not allowed
-                    let parsed_module = futures::executor::block_on(Self::parse_module(
+                    let parsed_module = async_std::task::block_on(Self::parse_module(
                         inner,
                         module_path,
                         file_path,
