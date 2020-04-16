@@ -1,0 +1,37 @@
+name: Verify
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target
+      - uses: actions/cache@v1
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: rustfmt, clippy
+          default: true
+          profile: minimal
+          toolchain: nightly
+      - uses: actions-rs/clippy-check@v1
+        with:
+          args: --all-features --package riko --package riko_core --package riko_runtime
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: make verify

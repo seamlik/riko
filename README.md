@@ -3,6 +3,8 @@ Riko (WiP)
 
 > Sub-optimal language binding generator
 
+![](https://github.com/seamlik/riko/workflows/Verify/badge.svg)
+
 This project aims to ease (or eliminate) the task of writing tedious wrapper code for a Rust crate in order for it to be used by other languages. All you have to do is mark the Rust code with the macros in this crate, and `cargo riko` will generate the wrapper code on both the Rust side and the target side.
 
 For all supported language targets, consult the modules in [riko_core](https://docs.rs/riko_core).
