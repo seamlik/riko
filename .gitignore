@@ -5,6 +5,7 @@
 .idea/
 .project
 .settings
+.vscode/
 /gradle/wrapper/
 /gradlew*
 Cargo.lock
