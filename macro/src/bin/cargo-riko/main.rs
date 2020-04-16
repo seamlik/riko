@@ -6,7 +6,7 @@ use config::Config;
 pub async fn main() -> anyhow::Result<()> {
     env_logger::init();
     for config in Config::read_all_configs()?.iter() {
-        if let None = config.cached.entry.iter().next() {
+        if config.cached.entry.iter().next().is_none() {
             log::warn!(
                 "Package `{}` does not have a `cdylib` or `lib` target, skipping…",
                 &config.cached.crate_name
