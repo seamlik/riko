@@ -1,12 +1,9 @@
-.PHONY: build
-build:
-	cargo build -p riko
+sample:
 	cargo run --bin cargo-riko
 	rustfmt target/riko/*.rs
-	cargo build
-	gradle assemble
+	cargo build --package riko_sample
 
-verify: build
+verify: sample
 	cargo fmt -- --check
 	cargo test
 	gradle check
