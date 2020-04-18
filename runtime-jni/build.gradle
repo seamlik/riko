@@ -2,6 +2,7 @@ plugins {
   id 'checkstyle'
   id 'com.diffplug.gradle.spotless' version '3.28.1'
   id 'maven-publish'
+  id 'org.checkerframework' version '0.4.14'
 }
 
 version = '0.0.1'
@@ -30,8 +31,14 @@ spotless {
   }
 }
 
+checkerFramework {
+  checkers = [
+    'org.checkerframework.checker.nullness.NullnessChecker'
+  ]
+}
+
 dependencies {
-  api 'org.checkerframework:checker-qual:2.11.0'
+  api 'org.checkerframework:checker-qual:3.3.0'
   implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.2'
   implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.10.2'
 }
