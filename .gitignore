@@ -1,4 +1,5 @@
 *.bk
+*.class
 *.iml
 .classpath
 .gradle/
