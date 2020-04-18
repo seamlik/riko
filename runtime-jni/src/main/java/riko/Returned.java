@@ -8,9 +8,9 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 public class Returned {
   private static final ObjectMapper mapper = new ObjectMapper();
 
-  @Nullable public Error error;
+  public @Nullable Error error;
 
-  @Nullable public JsonNode value;
+  public @Nullable JsonNode value;
 
   /**
    * Unwraps the returned value.
@@ -20,12 +20,13 @@ public class Returned {
    *
    * @throws ReturnedException If the Rust side returned an error.
    */
-  @Nullable
-  public <T> T unwrap(Class<T> type) {
+  public @Nullable <T> T unwrap(Class<T> type) {
     if (error != null) {
       throw new ReturnedException(error);
-    } else {
+    } else if (value != null) {
       return mapper.convertValue(this.value, type);
+    } else {
+      return null;
     }
   }
 }
