@@ -1,5 +1,7 @@
 package riko_sample.structs;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 public class Love {
-  public String target;
+  public @Nullable String target;
 }
