@@ -1,4 +1,14 @@
 //! Java support using JNI.
+//!
+//! # Dependencies for the generated code
+//!
+//! ## Rust
+//!
+//! * [jni](https://crates.io/crates/jni)
+//!
+//! ## Java
+//!
+//! * `riko-runtime-jni`
 
 use crate::ir::Crate;
 use crate::ir::Function;

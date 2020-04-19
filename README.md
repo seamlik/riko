@@ -23,7 +23,7 @@ Consult the `sample-*` projects on the details.
 1. Mark the items to be exported with `riko::*` attributes.
 2. Specify language targets in the package metadata. At least 1 target must be specified, otherwise `cargo riko` won't do anything.
 3. Add dependencies necessary to the generated code.
-4. Add a `cdylib` crate type.
+4. Add a `cdylib` or `lib` crate type.
 5. Run `cargo riko`.
 
 The generated code will be placed at directory `target/riko`.
@@ -41,13 +41,10 @@ To install the tools generating wrapper code, run `cargo install riko`. The inst
 Dependencies for Generated Code
 -------------------------------
 
-Some third party crates are used by the generated code.
-
 The mandatory ones are:
 
 * Runtime support: [riko_runtime](https://crates.io/crates/riko_runtime) with necessary features
 
 The optional ones are:
 
-* Interfacing with JNI: [jni](https://crates.io/crates/jni)
 * Marshaling byte arrays: [serde_bytes](https://crates.io/crates/serde_bytes)
