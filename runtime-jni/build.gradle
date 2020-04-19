@@ -32,6 +32,6 @@ spotless {
 
 dependencies {
   api 'org.checkerframework:checker-qual:3.3.0'
-  implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.2'
-  implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.10.2'
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
+  implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.10.3'
 }
