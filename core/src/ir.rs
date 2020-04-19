@@ -4,7 +4,7 @@
 //! contain the information sufficient for generating target code.
 
 #[cfg(test)]
-pub(crate) mod samples;
+pub mod sample;
 
 use crate::parse::Args;
 use crate::parse::Fun;

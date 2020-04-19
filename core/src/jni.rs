@@ -323,7 +323,7 @@ mod test {
 
     #[test]
     fn module() {
-        let ir = &crate::ir::samples::empty_module();
+        let ir = &crate::ir::sample::empty_module();
         let expected = r#"
             package riko_sample.example;
 
@@ -340,7 +340,7 @@ mod test {
 
     #[test]
     fn simple_function() {
-        let ir = crate::ir::samples::simple_function();
+        let ir = crate::ir::sample::simple_function();
 
         let expected = r#"
             private static native byte[] __riko_function(
@@ -398,7 +398,7 @@ mod test {
 
     #[test]
     fn returning_object() {
-        let ir = crate::ir::samples::returning_object();
+        let ir = crate::ir::sample::returning_object();
 
         let expected = r#"
             private static native byte[] __riko_function(
