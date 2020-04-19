@@ -1,10 +1,16 @@
 buildscript {
   repositories {
+    maven { url 'https://plugins.gradle.org/m2' }
     jcenter()
+  }
+
+  dependencies {
+    classpath 'org.checkerframework:checkerframework-gradle-plugin:0.4.14'
   }
 }
 
 subprojects {
+  apply plugin: 'org.checkerframework'
   apply plugin: 'java-library'
 
   group = 'riko'
@@ -21,5 +27,15 @@ subprojects {
 
   test {
     useJUnitPlatform()
+  }
+
+  checkerFramework {
+    excludeTests = true
+    checkers = [
+      'org.checkerframework.checker.nullness.NullnessChecker'
+    ]
+    extraJavacArgs = [
+      "-Astubs=${rootDir}/stub"
+    ]
   }
 }

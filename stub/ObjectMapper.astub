@@ -1,0 +1,7 @@
+package com.fasterxml.jackson.databind;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
+
+class ObjectMapper {
+  byte[] writeValueAsBytes(@Nullable Object src);
+}

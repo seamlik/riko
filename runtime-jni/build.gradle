@@ -2,7 +2,6 @@ plugins {
   id 'checkstyle'
   id 'com.diffplug.gradle.spotless' version '3.28.1'
   id 'maven-publish'
-  id 'org.checkerframework' version '0.4.14'
 }
 
 version = '0.0.1'
@@ -29,12 +28,6 @@ spotless {
     paddedCell()
     googleJavaFormat()
   }
-}
-
-checkerFramework {
-  checkers = [
-    'org.checkerframework.checker.nullness.NullnessChecker'
-  ]
 }
 
 dependencies {
