@@ -20,5 +20,5 @@ jobs:
       - run: make verify
       - uses: actions-rs/clippy-check@v1
         with:
-          args: --all-features --package riko --package riko_core --package riko_runtime
+          args: --all-features
           token: ${{ secrets.GITHUB_TOKEN }}
