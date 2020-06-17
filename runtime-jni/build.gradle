@@ -1,6 +1,6 @@
 plugins {
   id 'checkstyle'
-  id 'com.diffplug.gradle.spotless' version '3.28.1'
+  id 'com.diffplug.gradle.spotless' version '4.3.0'
   id 'maven-publish'
 }
 
@@ -19,19 +19,18 @@ publishing {
 }
 
 checkstyle {
-  toolVersion = '8.31'
+  toolVersion = '8.33'
   maxWarnings 0
 }
 
 spotless {
   java {
-    paddedCell()
     googleJavaFormat()
   }
 }
 
 dependencies {
-  api 'org.checkerframework:checker-qual:3.3.0'
-  implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
-  implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.10.3'
+  api 'org.checkerframework:checker-qual:3.4.1'
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.11.0'
+  implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.11.0'
 }

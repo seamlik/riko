@@ -5,7 +5,7 @@ buildscript {
   }
 
   dependencies {
-    classpath 'org.checkerframework:checkerframework-gradle-plugin:0.4.14'
+    classpath 'org.checkerframework:checkerframework-gradle-plugin:0.5.4'
   }
 }
 
