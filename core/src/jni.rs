@@ -65,13 +65,11 @@ impl TargetCodeWriter for JniWriter {
         };
 
         let return_block = match function.output.rule {
-            MarshalingRule::Unit => "".into(),
-            MarshalingRule::Object => format!(
-                "return result == null ? null : new {}(result);",
-                target_type_obj(&function.output.unwrapped_type.0, &crate_.name).join(".")
-            ),
-            _ => "return result;".into(),
-        };
+            MarshalingRule::Unit => "",
+            MarshalingRule::Object => "return result == null ? null : new riko.Object(result);",
+            _ => "return result;",
+        }
+        .to_string();
 
         let args = function
             .inputs
@@ -251,9 +249,10 @@ fn target_type_public(
             return "byte @ org.checkerframework.checker.nullness.qual.Nullable []".into()
         }
         MarshalingRule::Unit => return "void".into(),
-        MarshalingRule::Object | MarshalingRule::Struct => {
-            target_type_obj(unwrapped_type, crate_name)
+        MarshalingRule::Object => {
+            return "riko. @ org.checkerframework.checker.nullness.qual.Nullable Object".into()
         }
+        MarshalingRule::Struct => target_type_obj(unwrapped_type, crate_name),
         _ => target_type_primitive(rule).into_iter().map_into().collect(),
     }
     .into();
@@ -413,7 +412,7 @@ mod test {
         let expected = r#"
             private static native byte[] __riko_function(
             );
-            public static riko_sample. @ org.checkerframework.checker.nullness.qual.Nullable Love function(
+            public static riko. @ org.checkerframework.checker.nullness.qual.Nullable Object function(
             ) {
                 final byte[] returned = __riko_function(
                 );
@@ -421,7 +420,7 @@ mod test {
                   .Marshaler
                   .decode(returned)
                   .unwrap(java.lang.Integer.class);
-                return result == null ? null : new riko_sample.Love(result);
+                return result == null ? null : new riko.Object(result);
             }
         "#;
         let actual =

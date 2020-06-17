@@ -1,5 +1,8 @@
 package riko;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -66,6 +69,14 @@ class IntegrationTests {
     final Work work = new Work();
     work.salary = 10000;
     final Life life = riko_sample.structs.Module.structs(love, work);
-    Assertions.assertTrue(life.happy);
+    assertTrue(life.happy);
+  }
+
+  @Test
+  void object() {
+    final riko.Object object = riko_sample.object.Module.create_reactor();
+    assertTrue(object.alive());
+    object.close();
+    assertFalse(object.alive());
   }
 }
