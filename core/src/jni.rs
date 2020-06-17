@@ -165,7 +165,7 @@ impl TargetCodeWriter for JniWriter {
         let result: ItemFn = syn::parse_quote! {
             #(#cfg)*
             #[no_mangle]
-            #[allow(clippy::identity_conversion)]
+            #[allow(clippy::useless_conversion)]
             #[allow(clippy::let_unit_value)]
             #[allow(clippy::unit_arg)]
             pub extern "C" fn #mangled_name(#(#result_params),*) -> ::jni::sys::jbyteArray {
@@ -380,7 +380,7 @@ mod test {
 
         let expected = quote! {
             #[no_mangle]
-            #[allow(clippy::identity_conversion)]
+            #[allow(clippy::useless_conversion)]
             #[allow(clippy::let_unit_value)]
             #[allow(clippy::unit_arg)]
             pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
@@ -432,7 +432,7 @@ mod test {
 
         let expected = quote! {
             #[no_mangle]
-            #[allow(clippy::identity_conversion)]
+            #[allow(clippy::useless_conversion)]
             #[allow(clippy::let_unit_value)]
             #[allow(clippy::unit_arg)]
             pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
