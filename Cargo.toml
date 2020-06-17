@@ -3,3 +3,6 @@ members = [
   "macro",
   "sample-rust"
 ]
+
+[profile.dev]
+lto = true

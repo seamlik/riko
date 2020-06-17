@@ -1,5 +1,8 @@
 //! Handling heap-allocated objects.
 
+#[cfg(feature = "riko_jni")]
+pub mod jni;
+
 use crate::returned::Returned;
 use once_cell::sync::Lazy;
 use std::any::Any;
@@ -124,24 +127,4 @@ impl Default for Pool {
             counter: 0.into(),
         }
     }
-}
-
-#[cfg(feature = "riko_jni")]
-#[no_mangle]
-pub extern "C" fn Java_riko_Object_drop(
-    _: ::jni::JNIEnv,
-    _: ::jni::objects::JClass,
-    handle: Handle,
-) {
-    POOL.drop(handle);
-}
-
-#[cfg(feature = "riko_jni")]
-#[no_mangle]
-pub extern "C" fn Java_riko_Object_aliveNative(
-    _: ::jni::JNIEnv,
-    _: ::jni::objects::JClass,
-    handle: Handle,
-) -> bool {
-    POOL.alive(handle)
 }

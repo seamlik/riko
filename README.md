@@ -18,15 +18,18 @@ Contrary to the general atmosphere of Rust's ecosystem, the generated code is no
 Usage
 -----
 
-Consult the `sample-*` projects on the details.
+To generate language bindings for a crate:
 
 1. Mark the items to be exported with `riko::*` attributes.
 2. Specify language targets in the package metadata. At least 1 target must be specified, otherwise `cargo riko` won't do anything.
 3. Add dependencies necessary to the generated code.
 4. Add a `cdylib` or `lib` crate type.
-5. Run `cargo riko`.
+5. Enable [link-time optimization](https://doc.rust-lang.org/cargo/reference/profiles.html#lto) due to a [bug in the Rust compiler](https://github.com/rust-lang/rust/issues/50007). This is because crate `riko_runtime` exports some C functions.
+6. Run `cargo riko`.
 
 The generated code will be placed at directory `target/riko`.
+
+Consult the `sample-*` projects for more details.
 
 Install
 -------

@@ -10,15 +10,7 @@ public class Object implements AutoCloseable {
   }
 
   @Override
-  public void close() {
-    drop(handle);
-  }
+  public native void close();
 
-  private static native void drop(int handle);
-
-  private static native boolean aliveNative(int handle);
-
-  public boolean alive() {
-    return aliveNative(handle);
-  }
+  public native boolean alive();
 }
