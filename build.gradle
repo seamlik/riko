@@ -12,6 +12,7 @@ buildscript {
 subprojects {
   apply plugin: 'org.checkerframework'
   apply plugin: 'java-library'
+  apply plugin: 'checkstyle'
 
   group = 'riko'
   java.sourceCompatibility = JavaVersion.VERSION_1_8
@@ -37,5 +38,13 @@ subprojects {
     extraJavacArgs = [
       "-Astubs=${rootDir}/stub"
     ]
+  }
+
+  checkstyle {
+    toolVersion = '8.33'
+    maxWarnings 0
+  }
+  tasks.withType(Checkstyle) {
+    exclude '**/riko_sample/**'
   }
 }
