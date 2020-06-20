@@ -6,6 +6,18 @@ buildscript {
 
   dependencies {
     classpath 'org.checkerframework:checkerframework-gradle-plugin:0.5.4'
+    classpath 'org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:3.0'
+  }
+}
+
+apply plugin: 'org.sonarqube'
+
+sonarqube {
+  properties {
+    property 'sonar.host.url', 'https://sonarcloud.io'
+    property 'sonar.organization', "seamlik"
+    property 'sonar.projectKey', "seamlik_riko"
+    property 'sonar.pullrequest.github.repository', 'seamlik/riko'
   }
 }
 
