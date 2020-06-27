@@ -174,7 +174,7 @@ impl Display for Error {
     }
 }
 
-/// Cause of [Error].
+/// Cause of [Error](struct@Error).
 ///
 /// See the source code for the meaning of the variants.
 #[derive(Error, Debug)]

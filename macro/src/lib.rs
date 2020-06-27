@@ -14,9 +14,9 @@ use syn::ItemStruct;
 
 /// Specifies marshaling rule for a function parameter.
 ///
-/// To specify a rule for the return type, use the `marshal` parameter of [fun].
+/// To specify a rule for the return type, use the `marshal` parameter of [fun](macro@fun).
 ///
-/// This is a helper attribute for [fun]. In order to avoid name collision, the fully-qualified
+/// This is a helper attribute for [fun](macro@fun). In order to avoid name collision, the fully-qualified
 /// attribute name (`#[riko::marshal]`) must be used.
 ///
 /// # See
