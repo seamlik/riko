@@ -18,9 +18,7 @@ use crate::TargetCodeWriter;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
-use quote::ToTokens;
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::path::PathBuf;
 use syn::Ident;
 use syn::ItemFn;
@@ -48,25 +46,14 @@ impl TargetCodeWriter for JniWriter {
             .collect()
     }
 
-    fn write_target_function(&self, function: &Function, _: &Module, crate_: &Crate) -> String {
-        let return_type_public = target_type_public(
-            function.output.rule,
-            &function.output.unwrapped_type.0,
-            &crate_.name,
-        );
-
-        let return_type_local = match function.output.rule {
-            MarshalingRule::Object => "java.lang.Integer".into(),
-            MarshalingRule::Unit => "java.lang.Void".into(),
-            MarshalingRule::Struct => {
-                target_type_obj(&function.output.unwrapped_type.0, &crate_.name).join(".")
-            }
-            _ => target_type_primitive(function.output.rule).join("."),
-        };
+    fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
+        let return_type_public = target_type_public(function.output.rule);
 
         let return_block = match function.output.rule {
             MarshalingRule::Unit => "",
-            MarshalingRule::Object => "return result == null ? null : new riko.Object(result);",
+            MarshalingRule::Object => {
+                "return result == null ? null : new riko.Object(result.asInt32().intValue());"
+            }
             _ => "return result;",
         }
         .to_string();
@@ -81,13 +68,7 @@ impl TargetCodeWriter for JniWriter {
             .inputs
             .iter()
             .enumerate()
-            .map(|(idx, input)| {
-                format!(
-                    "final {} arg_{}",
-                    target_type_public(input.rule, &input.unwrapped_type.0, &crate_.name),
-                    idx
-                )
-            })
+            .map(|(idx, input)| format!("final {} arg_{}", target_type_public(input.rule), idx))
             .join(", ");
         let params_bridge = function
             .inputs
@@ -101,19 +82,19 @@ impl TargetCodeWriter for JniWriter {
               private static native byte[] __riko_{name}( {params_bridge} );
               public static {return_type_public} {name}( {params_public} ) {{
                 final byte[] returned = __riko_{name}( {args} );
-                final {return_type_local} result = riko
+                final org.bson. @ {nullable} BsonValue result = riko
                     .Marshaler
                     .decode(returned)
-                    .unwrap({return_type_local}.class);
+                    .unwrap();
                 {return_block}
               }}
             "#,
             args = args,
             name = &function.pubname,
+            nullable = NULLABLE_ATTRIBUTE,
             params_bridge = params_bridge,
             params_public = params_public,
             return_block = return_block,
-            return_type_local = return_type_local,
             return_type_public = return_type_public,
         )
     }
@@ -208,65 +189,13 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type_obj(unwrapped_type: &syn::Path, crate_name: &str) -> Vec<String> {
-    let mut result = unwrapped_type
-        .segments
-        .iter()
-        .map(|i| i.to_token_stream().to_string())
-        .collect::<Vec<_>>();
-    if let Some(first) = result.first_mut() {
-        if first == "crate" {
-            *first = crate_name.into();
-        }
-    }
-    result
-}
-
-fn target_type_primitive(rule: MarshalingRule) -> Vec<&'static str> {
-    let mut result = vec!["java", "lang"];
+fn target_type_public(rule: MarshalingRule) -> String {
     match rule {
-        MarshalingRule::Bool => result.push("Boolean"),
-        MarshalingRule::Bytes => return vec!["byte[]"],
-        MarshalingRule::I8 => result.push("Byte"),
-        MarshalingRule::I32 => result.push("Integer"),
-        MarshalingRule::I64 => result.push("Long"),
-        MarshalingRule::String => result.push("String"),
-        MarshalingRule::Object | MarshalingRule::Struct => {
-            unimplemented!("Use `target_type_obj()`")
-        }
-        MarshalingRule::Unit => unimplemented!("`void` must be treated differently"),
-    }
-    result
-}
+        MarshalingRule::Unit => "void".into(),
+        MarshalingRule::Object => format!("riko. @ {} Object", NULLABLE_ATTRIBUTE),
 
-fn target_type_public(
-    rule: MarshalingRule,
-    unwrapped_type: &syn::Path,
-    crate_name: &str,
-) -> String {
-    let mut raw_type: VecDeque<_> = match rule {
-        MarshalingRule::Bytes => {
-            return "byte @ org.checkerframework.checker.nullness.qual.Nullable []".into()
-        }
-        MarshalingRule::Unit => return "void".into(),
-        MarshalingRule::Object => {
-            return "riko. @ org.checkerframework.checker.nullness.qual.Nullable Object".into()
-        }
-        MarshalingRule::Struct => target_type_obj(unwrapped_type, crate_name),
-        _ => target_type_primitive(rule).into_iter().map_into().collect(),
+        _ => format!("org.bson. @ {} BsonValue", NULLABLE_ATTRIBUTE),
     }
-    .into();
-    let name = raw_type.pop_back().unwrap_or_default();
-    let prefix = raw_type;
-
-    let mut result = Vec::<String>::default();
-    if !prefix.is_empty() {
-        result.push(prefix.iter().map(|n| n.to_string() + ".").join(""));
-    }
-    result.push("@".into());
-    result.push(NULLABLE_ATTRIBUTE.into());
-    result.push(name);
-    result.join(" ")
 }
 
 fn mangle_function_name(name: &str, module: &[String], crate_: &str) -> Ident {
@@ -297,6 +226,7 @@ fn full_function_name(name: &str, module: &[String]) -> syn::Path {
 #[cfg(test)]
 mod test {
     use super::*;
+    use quote::ToTokens;
 
     #[test]
     fn full_function_name() {
@@ -356,18 +286,18 @@ mod test {
                 byte[] arg_0,
                 byte[] arg_1
             );
-            public static java.lang. @ org.checkerframework.checker.nullness.qual.Nullable String function(
-                final java.lang. @ org.checkerframework.checker.nullness.qual.Nullable Integer arg_0,
-                final java.lang. @ org.checkerframework.checker.nullness.qual.Nullable Long arg_1
+            public static org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue function(
+                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue arg_0,
+                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue arg_1
             ) {
                 final byte[] returned = __riko_function(
                     riko.Marshaler.encode(arg_0),
                     riko.Marshaler.encode(arg_1)
                 );
-                final java.lang.String result = riko
+                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
                   .Marshaler
                   .decode(returned)
-                  .unwrap(java.lang.String.class);
+                  .unwrap();
                 return result;
             }
         "#;
@@ -416,11 +346,11 @@ mod test {
             ) {
                 final byte[] returned = __riko_function(
                 );
-                final java.lang.Integer result = riko
+                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
                   .Marshaler
                   .decode(returned)
-                  .unwrap(java.lang.Integer.class);
-                return result == null ? null : new riko.Object(result);
+                  .unwrap();
+                return result == null ? null : new riko.Object(result.asInt32().intValue());
             }
         "#;
         let actual =
@@ -445,7 +375,7 @@ mod test {
                 ::riko_runtime::Marshal::to_jni(&result, &_env)
             }
         }
-        .to_string();
+            .to_string();
         let actual = JniWriter
             .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
             .into_token_stream()
@@ -454,38 +384,48 @@ mod test {
     }
 
     #[test]
-    fn target_type_public() {
+    fn function_with_nothing() {
+        let ir = crate::ir::sample::function_with_nothing();
+
+        let expected = r#"
+            private static native byte[] __riko_function(
+            );
+            public static void function(
+            ) {
+                final byte[] returned = __riko_function(
+                );
+                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
+                  .Marshaler
+                  .decode(returned)
+                  .unwrap();
+            }
+        "#;
+        let actual =
+            JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
         assert_eq!(
-            "java.lang. @ org.checkerframework.checker.nullness.qual.Nullable Integer",
-            super::target_type_public(MarshalingRule::I32, &syn::parse_quote! { i32 }, "riko")
+            crate::normalize_source_code(expected),
+            crate::normalize_source_code(&actual),
         );
-        assert_eq!(
-            "riko. @ org.checkerframework.checker.nullness.qual.Nullable Love",
-            super::target_type_public(
-                MarshalingRule::Struct,
-                &syn::parse_quote! { crate::Love },
-                "riko"
-            )
-        );
-        assert_eq!(
-            "riko.sample. @ org.checkerframework.checker.nullness.qual.Nullable Love",
-            super::target_type_public(
-                MarshalingRule::Struct,
-                &syn::parse_quote! { crate::sample::Love },
-                "riko"
-            )
-        );
-        assert_eq!(
-            "@ org.checkerframework.checker.nullness.qual.Nullable Love",
-            super::target_type_public(MarshalingRule::Struct, &syn::parse_quote! { Love }, "riko")
-        );
-        assert_eq!(
-            "byte @ org.checkerframework.checker.nullness.qual.Nullable []",
-            super::target_type_public(
-                MarshalingRule::Bytes,
-                &syn::parse_quote! { Vec<u8> },
-                "riko"
-            )
-        );
+
+        let expected = quote! {
+            #[no_mangle]
+            #[allow(clippy::useless_conversion)]
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
+            pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
+                _env: ::jni::JNIEnv,
+                _class: ::jni::objects::JClass
+            ) -> ::jni::sys::jbyteArray {
+                let result = crate::example::function();
+                let result: ::riko_runtime::returned::Returned<()> = result.into();
+                ::riko_runtime::Marshal::to_jni(&result, &_env)
+            }
+        }
+        .to_string();
+        let actual = JniWriter
+            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
+            .into_token_stream()
+            .to_string();
+        assert_eq!(expected, actual);
     }
 }

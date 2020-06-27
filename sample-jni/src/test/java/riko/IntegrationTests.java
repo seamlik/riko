@@ -4,11 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Paths;
+import org.bson.BsonBinary;
+import org.bson.BsonBoolean;
+import org.bson.BsonDocument;
+import org.bson.BsonInt32;
+import org.bson.BsonString;
+import org.bson.BsonValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import riko_sample.structs.Life;
-import riko_sample.structs.Love;
-import riko_sample.structs.Work;
 
 class IntegrationTests {
   static {
@@ -24,7 +27,10 @@ class IntegrationTests {
 
   @Test
   void i32() {
-    Assertions.assertEquals(2, riko_sample.Module._i32(1, 1));
+    Assertions.assertEquals(
+        2,
+        riko_sample.Module._i32(new BsonInt32(1), new BsonInt32(1)).asInt32().intValue()
+    );
   }
 
   @Test
@@ -34,19 +40,28 @@ class IntegrationTests {
 
   @Test
   void result_option() {
-    Assertions.assertEquals(2, riko_sample.Module.result_option(1, 1));
+    Assertions.assertEquals(
+        2,
+        riko_sample.Module.result_option(new BsonInt32(1), new BsonInt32(1)).asInt32().intValue()
+    );
     Assertions.assertThrows(Exception.class, () -> riko_sample.Module.result_option(null, null));
-    Assertions.assertNull(riko_sample.Module.result_option(null, 1));
+    Assertions.assertNull(riko_sample.Module.result_option(null, new BsonInt32(1)));
   }
 
   @Test
   void marshal() {
-    Assertions.assertEquals(-1, riko_sample.Module.marshal(1));
+    Assertions.assertEquals(-1, riko_sample.Module.marshal(new BsonInt32(1)).asInt32().intValue());
   }
 
   @Test
   void string() {
-    Assertions.assertEquals("love you", riko_sample.Module.string("love", " you"));
+    Assertions.assertEquals(
+        "love you",
+        riko_sample.Module.string(
+            new BsonString("love"),
+            new BsonString(" you")
+        ).asString().getValue()
+    );
   }
 
   @Test
@@ -54,22 +69,26 @@ class IntegrationTests {
     byte[] a = {1, 2, 3};
     byte[] b = {4, 5, 6};
     byte[] expected = {1, 2, 3, 4, 5, 6};
-    Assertions.assertArrayEquals(expected, riko_sample.Module.bytes(a, b));
+    Assertions.assertArrayEquals(
+        expected,
+        riko_sample.Module.bytes(new BsonBinary(a), new BsonBinary(b)).asBinary().getData()
+    );
   }
 
   @Test
   void bool() {
-    Assertions.assertEquals(false, riko_sample.Module._bool(false, true));
+    assertFalse(riko_sample.Module._bool(
+        new BsonBoolean(false),
+        new BsonBoolean(true)
+    ).asBoolean().getValue());
   }
 
   @Test
   void structs() {
-    final Love love = new Love();
-    love.target = "Her";
-    final Work work = new Work();
-    work.salary = 10000;
-    final Life life = riko_sample.structs.Module.structs(love, work);
-    assertTrue(life.happy);
+    final BsonValue love = new BsonDocument("target", new BsonString("Lan"));
+    final BsonValue work = new BsonDocument("salary", new BsonInt32(10000));
+    final BsonValue life = riko_sample.structs.Module.structs(love, work);
+    assertTrue(life.asDocument().getBoolean("happy").getValue());
   }
 
   @Test

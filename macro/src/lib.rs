@@ -10,7 +10,6 @@ mod expand;
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::ItemFn;
-use syn::ItemStruct;
 
 /// Specifies marshaling rule for a function parameter.
 ///
@@ -39,17 +38,6 @@ pub fn fun(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut subject = syn::parse_macro_input!(item as ItemFn);
     expand::remove_marshal_attrs(&mut subject);
     subject.into_token_stream().into()
-}
-
-/// Generates language bindings for a stack-allocated struct.
-///
-/// The struct being marked by this attribute will be serialized using [serde] in
-/// [CBOR](https://cbor.io). A version of this struct in the target code will also be generated.
-#[proc_macro_attribute]
-pub fn stct(_: TokenStream, item: TokenStream) -> TokenStream {
-    syn::parse_macro_input!(item as ItemStruct)
-        .into_token_stream()
-        .into()
 }
 
 /// Ignores the marked item.

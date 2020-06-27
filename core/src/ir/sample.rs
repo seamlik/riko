@@ -63,3 +63,26 @@ pub fn returning_object() -> Crate {
         }],
     }
 }
+
+pub fn function_with_nothing() -> Crate {
+    Crate {
+        name: "riko_sample".into(),
+        modules: vec![Module {
+            functions: vec![Function {
+                name: "function".into(),
+                pubname: "function".into(),
+                inputs: vec![],
+                output: Output {
+                    rule: MarshalingRule::Unit,
+                    unwrapped_type: Assertable(syn::Path {
+                        leading_colon: None,
+                        segments: Default::default(),
+                    }),
+                },
+                cfg: vec![],
+            }],
+            path: vec!["example".into()],
+            cfg: vec![],
+        }],
+    }
+}
