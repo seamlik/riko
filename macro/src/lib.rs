@@ -51,3 +51,22 @@ pub fn stct(_: TokenStream, item: TokenStream) -> TokenStream {
         .into_token_stream()
         .into()
 }
+
+/// Ignores the marked item.
+///
+/// Riko's source code parser will ignore any item marked by this attribute, as well as any child-items.
+///
+/// Usually used to mark the module containing generated code or bridge code. It not only speeds up the
+/// parsing, but also avoids file-not-found errors.
+///
+/// # Example
+///
+/// ```ignore
+/// #[path = "../../target/riko/riko_sample.rs"]
+/// #[riko::ignore]
+/// mod bridge;
+/// ```
+#[proc_macro_attribute]
+pub fn ignore(_: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}

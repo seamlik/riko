@@ -1,4 +1,7 @@
+#![feature(proc_macro_hygiene)]
+
 #[path = "../../target/riko/riko_sample.rs"]
+#[riko::ignore]
 mod bridge;
 
 mod object;
