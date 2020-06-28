@@ -47,9 +47,6 @@ subprojects {
     checkers = [
       'org.checkerframework.checker.nullness.NullnessChecker'
     ]
-    extraJavacArgs = [
-      "-Astubs=${rootDir}/stub"
-    ]
   }
 
   checkstyle {
