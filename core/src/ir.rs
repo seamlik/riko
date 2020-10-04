@@ -713,12 +713,12 @@ mod test {
         };
 
         let expected = [
-            r#"# [ cfg ( feature = "riko_outer" ) ]"#,
-            r#"# [ cfg ( feature = "riko_inner" ) ]"#,
-            r#"# [ cfg ( feature = "util_outer" ) ]"#,
-            r#"# [ cfg ( feature = "util_inner" ) ]"#,
-            r#"# [ cfg ( feature = "function_outer" ) ]"#,
-            r#"# [ cfg ( feature = "function_inner" ) ]"#,
+            r#"# [cfg (feature = "riko_outer")]"#,
+            r#"# [cfg (feature = "riko_inner")]"#,
+            r#"# [cfg (feature = "util_outer")]"#,
+            r#"# [cfg (feature = "util_inner")]"#,
+            r#"# [cfg (feature = "function_outer")]"#,
+            r#"# [cfg (feature = "function_inner")]"#,
         ]
         .iter()
         .map(|s| s.to_string())
