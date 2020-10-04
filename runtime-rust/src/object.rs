@@ -107,10 +107,6 @@ impl Pool {
         handle
     }
 
-    pub const fn new() -> Lazy<Self> {
-        Lazy::new(Default::default)
-    }
-
     /// Checks if the object pointed by `handle` is alive.
     pub fn alive(&self, handle: Handle) -> bool {
         self.pool
