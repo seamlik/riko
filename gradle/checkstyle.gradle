@@ -1,0 +1,21 @@
+apply plugin: 'checkstyle'
+
+configurations {
+  checkstyleConfig
+}
+
+dependencies {
+  checkstyleConfig("com.puppycrawl.tools:checkstyle:${VERSIONS.checkstyle}") {
+    transitive = false
+  }
+}
+
+checkstyle {
+  config = resources.text.fromArchiveEntry(configurations.checkstyleConfig, 'google_checks.xml')
+  toolVersion "${VERSIONS.checkstyle}"
+  maxWarnings 0
+}
+
+tasks.withType(Checkstyle) {
+  exclude '**/riko_sample/**'
+}
