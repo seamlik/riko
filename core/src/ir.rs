@@ -29,7 +29,17 @@ use syn::ReturnType;
 use syn::Type;
 use syn::TypePath;
 
-fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn::Result<PathBuf> {
+/// Resolve the file path to a chile module.
+///
+/// # Parameters
+///
+/// * `module_name_parent`: The name of the parent module. If none, it means the crate root.
+/// * `file_path_parent`: The file path to the parent module.
+fn resolve_module_path(
+    module_name_parent: Option<&String>,
+    file_path_parent: PathBuf,
+    module_child: &ItemMod,
+) -> syn::Result<PathBuf> {
     if let Some(attr) = module_child
         .attrs
         .iter()
@@ -51,14 +61,30 @@ fn resolve_module_path(file_path_parent: PathBuf, module_child: &ItemMod) -> syn
         } else {
             Err(syn::Error::new_spanned(attr, "Expect a name-value pair"))
         }
+    } else if let Some(parent) = module_name_parent {
+        // Not crate root
+        let mut result = file_path_parent;
+        let child = module_child.ident.to_string();
+        result.set_file_name(parent);
+        result.push(format!("{}.rs", &child));
+        if result.is_file() {
+            Ok(result)
+        } else {
+            result.set_file_name(&child);
+            result.push("mod.rs");
+            Ok(result)
+        }
     } else {
+        // Crate root
         let mut result = file_path_parent;
         result.set_file_name(format!("{}.rs", module_child.ident.to_string()));
-        if !result.is_file() {
+        if result.is_file() {
+            Ok(result)
+        } else {
             result.set_file_name(module_child.ident.to_string());
             result.push("mod.rs");
+            Ok(result)
         }
-        Ok(result)
     }
 }
 
@@ -270,8 +296,9 @@ impl Module {
     ///
     /// # Parameters
     ///
-    /// * `module_path`: The path of the module being parsed. It serves as the prefix of the paths of all
-    ///   of its child modules.
+    /// * `module_path`: The fully quialified name of the module being parsed. It serves as the prefix of the paths of all
+    ///   of its child modules. An empty path means the crate root.
+    /// * `file_path`: Path to the file containing the `items`.
     ///
     /// # Returns
     ///
@@ -347,13 +374,15 @@ impl Module {
         let mut module_path_child: Vec<String> = module_path_parent.into();
         module_path_child.push(module.ident.to_string());
 
-        let file_path_child =
-            resolve_module_path(file_path_parent.to_owned(), &module).map_err(|err| {
-                crate::Error {
-                    file: file_path_parent.to_owned(),
-                    source: ErrorSource::Parse(err),
-                }
-            })?;
+        let file_path_child = resolve_module_path(
+            module_path_parent.last(),
+            file_path_parent.to_owned(),
+            &module,
+        )
+        .map_err(|err| crate::Error {
+            file: file_path_parent.to_owned(),
+            source: ErrorSource::Parse(err),
+        })?;
 
         if let Some((_, items)) = module.content {
             Self::parse_items(
