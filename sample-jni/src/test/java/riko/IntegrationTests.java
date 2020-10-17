@@ -44,7 +44,8 @@ class IntegrationTests {
         2,
         riko_sample.Module.result_option(new BsonInt32(1), new BsonInt32(1)).asInt32().intValue()
     );
-    Assertions.assertThrows(Exception.class, () -> riko_sample.Module.result_option(null, null));
+    Assertions.assertThrows(
+        ReturnedException.class, () -> riko_sample.Module.result_option(null, null));
     Assertions.assertNull(riko_sample.Module.result_option(null, new BsonInt32(1)));
   }
 

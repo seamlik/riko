@@ -8,6 +8,7 @@ import org.bson.BsonDocumentReader;
 import org.bson.BsonValue;
 import org.bson.codecs.BsonValueCodec;
 import org.bson.codecs.DecoderContext;
+import org.bson.codecs.StringCodec;
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
@@ -21,9 +22,9 @@ public class Marshaler {
   private static final String ROOT_KEY_OF_ARGUMENT_DOCUMENT = "value";
   private static final CodecRegistry codecRegistry =
       CodecRegistries.fromRegistries(
-          CodecRegistries.fromCodecs(new BsonValueCodec()),
+          CodecRegistries.fromCodecs(new BsonValueCodec(), new StringCodec()),
           CodecRegistries.fromProviders(
-              PojoCodecProvider.builder().register(Returned.class).build()));
+              PojoCodecProvider.builder().register(Returned.class, Error.class).build()));
 
   /** Serializes a function argument as BSON. */
   public static byte[] encode(final @Nullable BsonValue src) {
