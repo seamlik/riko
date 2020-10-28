@@ -26,6 +26,7 @@ use syn::ItemFn;
 const CLASS_FOR_MODULE: &str = "Module";
 const PREFIX_FOR_NATIVE: &str = "__riko_";
 const NULLABLE_ATTRIBUTE: &str = "org.checkerframework.checker.nullness.qual.Nullable";
+const NONNULL_ATTRIBUTE: &str = "org.checkerframework.checker.nullness.qual.NonNull";
 
 /// Writes JNI bindings.
 pub struct JniWriter;
@@ -47,13 +48,12 @@ impl TargetCodeWriter for JniWriter {
     }
 
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
-        let return_type_public = target_type_public(function.output.rule);
+        // TODO: Support returning nullabe objects
+        let return_type_public = target_type_public(function.output.rule, false);
 
         let return_block = match function.output.rule {
             MarshalingRule::Unit => "",
-            MarshalingRule::Object => {
-                "return result == null ? null : new riko.Object(result.asInt32().intValue());"
-            }
+            MarshalingRule::Object => "return new riko.Object(result.asInt32().intValue());",
             _ => "return result;",
         }
         .to_string();
@@ -68,7 +68,9 @@ impl TargetCodeWriter for JniWriter {
             .inputs
             .iter()
             .enumerate()
-            .map(|(idx, input)| format!("final {} arg_{}", target_type_public(input.rule), idx))
+            .map(|(idx, input)| {
+                format!("final {} arg_{}", target_type_public(input.rule, true), idx)
+            })
             .join(", ");
         let params_bridge = function
             .inputs
@@ -82,7 +84,7 @@ impl TargetCodeWriter for JniWriter {
               private static native byte[] __riko_{name}( {params_bridge} );
               public static {return_type_public} {name}( {params_public} ) {{
                 final byte[] returned = __riko_{name}( {args} );
-                final org.bson. @ {nullable} BsonValue result = riko
+                final org.bson.BsonValue result = riko
                     .Marshaler
                     .decode(returned)
                     .unwrap();
@@ -91,7 +93,6 @@ impl TargetCodeWriter for JniWriter {
             "#,
             args = args,
             name = &function.pubname,
-            nullable = NULLABLE_ATTRIBUTE,
             params_bridge = params_bridge,
             params_public = params_public,
             return_block = return_block,
@@ -189,12 +190,17 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type_public(rule: MarshalingRule) -> String {
+fn target_type_public(rule: MarshalingRule, nullable: bool) -> String {
+    let nullability = if nullable {
+        NULLABLE_ATTRIBUTE
+    } else {
+        NONNULL_ATTRIBUTE
+    };
     match rule {
         MarshalingRule::Unit => "void".into(),
-        MarshalingRule::Object => format!("riko. @ {} Object", NULLABLE_ATTRIBUTE),
+        MarshalingRule::Object => format!("riko. @ {} Object", nullability),
 
-        _ => format!("org.bson. @ {} BsonValue", NULLABLE_ATTRIBUTE),
+        _ => format!("org.bson. @ {} BsonValue", nullability),
     }
 }
 
@@ -286,7 +292,7 @@ mod test {
                 byte[] arg_0,
                 byte[] arg_1
             );
-            public static org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue function(
+            public static org.bson. @ org.checkerframework.checker.nullness.qual.NonNull BsonValue function(
                 final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue arg_0,
                 final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue arg_1
             ) {
@@ -294,7 +300,7 @@ mod test {
                     riko.Marshaler.encode(arg_0),
                     riko.Marshaler.encode(arg_1)
                 );
-                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
+                final org.bson.BsonValue result = riko
                   .Marshaler
                   .decode(returned)
                   .unwrap();
@@ -342,15 +348,15 @@ mod test {
         let expected = r#"
             private static native byte[] __riko_function(
             );
-            public static riko. @ org.checkerframework.checker.nullness.qual.Nullable Object function(
+            public static riko. @ org.checkerframework.checker.nullness.qual.NonNull Object function(
             ) {
                 final byte[] returned = __riko_function(
                 );
-                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
+                final org.bson.BsonValue result = riko
                   .Marshaler
                   .decode(returned)
                   .unwrap();
-                return result == null ? null : new riko.Object(result.asInt32().intValue());
+                return new riko.Object(result.asInt32().intValue());
             }
         "#;
         let actual =
@@ -394,7 +400,7 @@ mod test {
             ) {
                 final byte[] returned = __riko_function(
                 );
-                final org.bson. @ org.checkerframework.checker.nullness.qual.Nullable BsonValue result = riko
+                final org.bson.BsonValue result = riko
                   .Marshaler
                   .decode(returned)
                   .unwrap();

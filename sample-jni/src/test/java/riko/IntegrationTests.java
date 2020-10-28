@@ -46,7 +46,7 @@ class IntegrationTests {
     );
     Assertions.assertThrows(
         ReturnedException.class, () -> riko_sample.Module.result_option(null, null));
-    Assertions.assertNull(riko_sample.Module.result_option(null, new BsonInt32(1)));
+    Assertions.assertTrue(riko_sample.Module.result_option(null, new BsonInt32(1)).isNull());
   }
 
   @Test

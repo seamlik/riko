@@ -1,5 +1,6 @@
 package riko;
 
+import org.bson.BsonNull;
 import org.bson.BsonValue;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -14,11 +15,11 @@ public class Returned {
    *
    * @throws ReturnedException If the Rust side returned an error.
    */
-  public @Nullable BsonValue unwrap() {
+  public BsonValue unwrap() {
     if (error != null) {
       throw new ReturnedException(error);
     } else if (value == null || value.isNull()) {
-      return null;
+      return BsonNull.VALUE;
     } else {
       return value;
     }
