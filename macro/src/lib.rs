@@ -19,7 +19,8 @@ use syn::ItemFn;
 /// attribute name (`#[riko::marshal]`) must be used.
 ///
 /// # See
-/// * [MarshalingRule](riko_core::parse::MarshalingRule)
+///
+/// * [MarshalingRule](riko_core::ir::MarshalingRule)
 #[proc_macro_attribute]
 pub fn marshal(_: TokenStream, _: TokenStream) -> TokenStream {
     unimplemented!("Must not be used on its own")
