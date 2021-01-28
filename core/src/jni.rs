@@ -108,9 +108,10 @@ impl TargetCodeWriter for JniWriter {
         let mangled_name = mangle_function_name(&function.pubname, &module.path, &root.name);
 
         // Parameters of the generated function
-        let mut result_params = Vec::<TokenStream>::new();
-        result_params.push(quote! { _env: ::jni::JNIEnv });
-        result_params.push(quote! { _class: ::jni::objects::JClass });
+        let mut result_params = vec![
+            quote! { _env: ::jni::JNIEnv },
+            quote! { _class: ::jni::objects::JClass },
+        ];
 
         // Function arguments placed at the invocation of the original function
         let mut result_args = Vec::<TokenStream>::new();
