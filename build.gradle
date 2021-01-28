@@ -1,7 +1,7 @@
 buildscript {
   ext {
     VERSIONS = [
-      checkstyle: '8.36.2',
+      checkstyle: '8.39',
       junit: '5.7.0',
     ]
   }
@@ -12,8 +12,8 @@ buildscript {
   }
 
   dependencies {
-    classpath 'org.checkerframework:checkerframework-gradle-plugin:0.5.10'
-    classpath 'org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:3.0'
+    classpath 'org.checkerframework:checkerframework-gradle-plugin:0.5.13'
+    classpath 'org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:3.1.1'
   }
 }
 

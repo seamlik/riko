@@ -24,6 +24,6 @@ spotless {
 }
 
 dependencies {
-  api 'org.checkerframework:checker-qual:3.7.0'
-  api 'org.mongodb:bson:4.1.0'
+  api 'org.checkerframework:checker-qual:3.9.1'
+  api 'org.mongodb:bson:4.2.0'
 }
