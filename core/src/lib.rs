@@ -10,7 +10,8 @@ pub mod parse;
 pub(crate) mod util;
 
 use async_std::fs::File;
-use futures::prelude::*;
+use futures_util::io::AsyncWriteExt;
+use futures_util::TryFutureExt;
 use ir::Crate;
 use ir::Function;
 use ir::Module;
