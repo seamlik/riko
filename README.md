@@ -41,7 +41,6 @@ To use Riko's attributes, add `riko` to package's dependencies.
 To install the tools generating wrapper code, run `cargo install riko`. The installed binaries are:
 
 * `cargo-riko`: For use inside a Cargo project
-* `riko` (WiP): For use without the Cargo infrasturcture
 
 Dependencies for Generated Code
 -------------------------------
