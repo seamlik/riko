@@ -10,6 +10,8 @@ use crate::parse::Args;
 use crate::parse::Fun;
 use crate::parse::Marshal;
 use crate::ErrorSource;
+use futures_util::future::LocalBoxFuture;
+use futures_util::FutureExt;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::fmt::Debug;
@@ -258,7 +260,8 @@ impl Crate {
             source: ErrorSource::Parse(err),
         })?;
         Ok(Self {
-            modules: Module::parse_items(file.items.into_iter(), &[], src, file.attrs.into_iter())?,
+            modules: Module::parse_items(file.items.into_iter(), &[], src, file.attrs.into_iter())
+                .await?,
             name,
         })
     }
@@ -303,55 +306,56 @@ impl Module {
     /// # Returns
     ///
     /// Contains the module being parsed and all its child modules.
-    fn parse_items(
-        items: impl Iterator<Item = Item>,
-        module_path: &[String],
-        file_path: &Path,
-        attrs: impl Iterator<Item = Attribute>,
-    ) -> Result<Vec<Self>, crate::Error> {
-        let mut result = Vec::<Self>::new();
-        let mut functions = Vec::<Function>::new();
+    ///
+    /// Boxed Future to work around recursive async.
+    fn parse_items<'a>(
+        items: impl Iterator<Item = Item> + 'static,
+        module_path: &'a [String],
+        file_path: &'a Path,
+        attrs: impl Iterator<Item = Attribute> + 'static,
+    ) -> LocalBoxFuture<'a, Result<Vec<Self>, crate::Error>> {
+        async move {
+            let mut result = Vec::<Self>::new();
+            let mut functions = Vec::<Function>::new();
 
-        let conv_err = |err| crate::Error {
-            file: file_path.to_owned(),
-            source: ErrorSource::Riko(err),
-        };
+            let conv_err = |err| crate::Error {
+                file: file_path.to_owned(),
+                source: ErrorSource::Riko(err),
+            };
 
-        for item in items {
-            match item {
-                Item::Fn(inner) => {
-                    if find_ignore_attribute(inner.attrs.iter()) {
-                        log::info!("Ignoring function `{}`", inner.sig.ident);
-                        continue;
+            for item in items {
+                match item {
+                    Item::Fn(inner) => {
+                        if find_ignore_attribute(inner.attrs.iter()) {
+                            log::info!("Ignoring function `{}`", inner.sig.ident);
+                            continue;
+                        }
+
+                        if let Some(args) = Fun::take_from(inner.attrs.iter()).map_err(conv_err)? {
+                            functions.push(Function::parse(inner, args).map_err(conv_err)?);
+                        }
                     }
+                    Item::Mod(inner) => {
+                        if find_ignore_attribute(inner.attrs.iter()) {
+                            log::info!("Ignoring module `{}`", inner.ident);
+                            continue;
+                        }
 
-                    if let Some(args) = Fun::take_from(inner.attrs.iter()).map_err(conv_err)? {
-                        functions.push(Function::parse(inner, args).map_err(conv_err)?);
+                        let parsed_module =
+                            Self::parse_module(inner, module_path, file_path).await?;
+                        result.extend(parsed_module);
                     }
+                    _ => {}
                 }
-                Item::Mod(inner) => {
-                    if find_ignore_attribute(inner.attrs.iter()) {
-                        log::info!("Ignoring module `{}`", inner.ident);
-                        continue;
-                    }
-
-                    // Blocks here because recursive async fn is not allowed
-                    let parsed_module = async_std::task::block_on(Self::parse_module(
-                        inner,
-                        module_path,
-                        file_path,
-                    ))?;
-                    result.extend(parsed_module);
-                }
-                _ => {}
             }
+            result.push(Self {
+                functions,
+                path: module_path.into(),
+                cfg: extract_cfg(attrs),
+            });
+            Ok(result)
         }
-        result.push(Self {
-            functions,
-            path: module_path.into(),
-            cfg: extract_cfg(attrs),
-        });
-        Ok(result)
+        .boxed_local()
     }
 
     /// Parses a Rust module into a set of [Module]s.
@@ -391,6 +395,7 @@ impl Module {
                 &file_path_parent,
                 module.attrs.into_iter(),
             )
+            .await
         } else {
             log::info!("Reading `{}`", file_path_child.display());
             let raw = async_std::fs::read_to_string(&file_path_child)
@@ -412,6 +417,7 @@ impl Module {
                 &file_path_child,
                 ast.attrs.into_iter(),
             )
+            .await
         }
     }
 }
