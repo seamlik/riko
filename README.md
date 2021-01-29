@@ -31,7 +31,7 @@ To generate language bindings for a crate:
 
 The generated code will be placed at directory `target/riko`.
 
-Consult the `sample-*` projects for more details.
+Consult the projects under directory `sample` for more details.
 
 Install
 -------

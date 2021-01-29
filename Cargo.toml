@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "macro",
-  "sample-rust"
+  "sample/rust"
 ]
 
 [profile.dev]

@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class IntegrationTests {
   static {
     final String library =
-        Paths.get("..", "target", "debug", "libriko_sample.so").toAbsolutePath().toString();
+        Paths.get("..", "..", "target", "debug", "libriko_sample.so").toAbsolutePath().toString();
     System.load(library);
   }
 

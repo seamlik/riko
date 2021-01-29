@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 jni = "0"
-riko = { path = "../macro" }
-riko_runtime = { path = "../runtime-rust", features = ["riko_jni"] }
+riko = { path = "../../macro" }
+riko_runtime = { path = "../../runtime", features = ["riko_jni"] }
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0"
