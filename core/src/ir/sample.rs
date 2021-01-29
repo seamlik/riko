@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub fn empty_module() -> Crate {
+pub(crate) fn empty_module() -> Crate {
     Crate {
         name: "riko_sample".into(),
         modules: vec![Module {
@@ -13,7 +13,7 @@ pub fn empty_module() -> Crate {
     }
 }
 
-pub fn simple_function() -> Crate {
+pub(crate) fn simple_function() -> Crate {
     Crate {
         name: "riko_sample".into(),
         modules: vec![Module {
@@ -44,7 +44,7 @@ pub fn simple_function() -> Crate {
     }
 }
 
-pub fn returning_object() -> Crate {
+pub(crate) fn returning_object() -> Crate {
     Crate {
         name: "riko_sample".into(),
         modules: vec![Module {
@@ -64,7 +64,7 @@ pub fn returning_object() -> Crate {
     }
 }
 
-pub fn function_with_nothing() -> Crate {
+pub(crate) fn function_with_nothing() -> Crate {
     Crate {
         name: "riko_sample".into(),
         modules: vec![Module {

@@ -5,9 +5,9 @@
 #![feature(iter_order_by)]
 
 pub mod ir;
-pub mod jni;
+mod jni;
 pub mod parse;
-pub(crate) mod util;
+mod util;
 
 use async_std::fs::File;
 use futures_util::io::AsyncWriteExt;
@@ -28,7 +28,7 @@ use syn::ItemFn;
 use thiserror::Error;
 
 /// Target code generation.
-pub trait TargetCodeWriter {
+trait TargetCodeWriter {
     /// Generates target code for the entire crate and writes to a tree of files.
     fn write_target_all(&self, ir: &Crate) -> HashMap<PathBuf, String>;
 

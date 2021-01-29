@@ -15,8 +15,8 @@ use syn::MetaNameValue;
 use syn::NestedMeta;
 use syn::Token;
 
-/// Arguments of a `#[riko::...]`.
-pub trait Args: Sized {
+/// Arguments of a `#[riko::…]`.
+pub(crate) trait Args: Sized {
     /// Full name of the attribute.
     const NAME: &'static [&'static str];
 

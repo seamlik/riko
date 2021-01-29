@@ -4,7 +4,7 @@
 //! contain the information sufficient for generating target code.
 
 #[cfg(test)]
-pub mod sample;
+pub(crate) mod sample;
 
 use crate::parse::Args;
 use crate::parse::Fun;
@@ -206,7 +206,7 @@ impl MarshalingRule {
 ///
 /// This is the root of an IR tree.
 #[derive(Debug, PartialEq)]
-pub struct Crate {
+pub(crate) struct Crate {
     pub modules: Vec<Module>,
     pub name: String,
 }
@@ -250,7 +250,7 @@ impl Crate {
 
 /// Module.
 #[derive(Debug, PartialEq)]
-pub struct Module {
+pub(crate) struct Module {
     pub functions: Vec<Function>,
 
     /// Full path of this [Module]. An empty path indicates the root module.
@@ -389,7 +389,7 @@ impl Module {
 
 /// Free-standing function.
 #[derive(Debug, PartialEq)]
-pub struct Function {
+pub(crate) struct Function {
     pub inputs: Vec<Input>,
     pub name: String,
     pub output: Output,
@@ -434,7 +434,7 @@ impl Function {
 
 /// Function parameter.
 #[derive(Debug, PartialEq)]
-pub struct Input {
+pub(crate) struct Input {
     pub rule: MarshalingRule,
     /// If the parameter accepts a reference.
     pub borrow: bool,
@@ -472,7 +472,7 @@ impl Input {
 
 /// Function return type.
 #[derive(Debug, PartialEq)]
-pub struct Output {
+pub(crate) struct Output {
     pub rule: MarshalingRule,
 
     /// The actual type wrapped inside a [Result] or an [Option].
