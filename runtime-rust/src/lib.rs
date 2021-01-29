@@ -7,6 +7,7 @@
 //! * `riko_jni`
 
 #![feature(const_fn)]
+#![feature(once_cell)]
 
 use bson::Bson;
 use bson::Document;

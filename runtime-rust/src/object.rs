@@ -4,10 +4,10 @@
 pub mod jni;
 
 use crate::returned::Returned;
-use once_cell::sync::Lazy;
 use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
+use std::lazy::SyncLazy;
 use std::sync::atomic::AtomicI32;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -68,7 +68,7 @@ where
 pub type Handle = i32;
 
 /// The global [Pool] that every [Object] is stored.
-pub static POOL: Lazy<Pool> = Lazy::new(Default::default);
+pub static POOL: SyncLazy<Pool> = SyncLazy::new(Default::default);
 
 /// Thread-safe collection of [Object]s.
 pub struct Pool {
