@@ -15,7 +15,7 @@ proc-macro2 = { version = "1", features = ["span-locations"]}
 quote = "1"
 strum = "0"
 strum_macros = "0"
-syn = "1"
+syn = { version = "1", features = ["extra-traits"] }
 thiserror = "1"
 
 [dev-dependencies]

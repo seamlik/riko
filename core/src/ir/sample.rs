@@ -24,17 +24,17 @@ pub fn simple_function() -> Crate {
                     Input {
                         rule: MarshalingRule::I32,
                         borrow: true,
-                        unwrapped_type: Assertable(syn::parse_quote! { i32 }),
+                        unwrapped_type: syn::parse_quote! { i32 },
                     },
                     Input {
                         rule: MarshalingRule::I64,
                         borrow: false,
-                        unwrapped_type: Assertable(syn::parse_quote! { i64 }),
+                        unwrapped_type: syn::parse_quote! { i64 },
                     },
                 ],
                 output: Output {
                     rule: MarshalingRule::String,
-                    unwrapped_type: Assertable(syn::parse_quote! { String }),
+                    unwrapped_type: syn::parse_quote! { String },
                 },
                 cfg: Default::default(),
             }],
@@ -54,7 +54,7 @@ pub fn returning_object() -> Crate {
                 inputs: vec![],
                 output: Output {
                     rule: MarshalingRule::Object,
-                    unwrapped_type: Assertable(syn::parse_quote! { crate::Love }),
+                    unwrapped_type: syn::parse_quote! { crate::Love },
                 },
                 cfg: vec![],
             }],
@@ -74,10 +74,10 @@ pub fn function_with_nothing() -> Crate {
                 inputs: vec![],
                 output: Output {
                     rule: MarshalingRule::Unit,
-                    unwrapped_type: Assertable(syn::Path {
+                    unwrapped_type: syn::Path {
                         leading_colon: None,
                         segments: Default::default(),
-                    }),
+                    },
                 },
                 cfg: vec![],
             }],

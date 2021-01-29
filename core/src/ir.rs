@@ -12,10 +12,8 @@ use crate::parse::Marshal;
 use crate::ErrorSource;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
-use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::path::Path;
 use std::path::PathBuf;
 use strum_macros::*;
@@ -90,52 +88,19 @@ fn resolve_module_path(
     }
 }
 
-fn extract_cfg(src: impl Iterator<Item = Attribute>) -> Vec<Assertable<Attribute>> {
+fn extract_cfg(src: impl Iterator<Item = Attribute>) -> Vec<Attribute> {
     src.filter(|attr| attr.path.to_token_stream().to_string() == "cfg")
         .map(|mut attr| {
             if let AttrStyle::Inner(_) = attr.style {
                 attr.style = AttrStyle::Outer;
             }
-            Assertable(attr)
+            attr
         })
         .collect()
 }
 
 fn find_ignore_attribute<'a>(mut src: impl Iterator<Item = &'a Attribute>) -> bool {
     src.any(|attr| attr.path.to_token_stream().to_string() == "riko :: ignore")
-}
-
-/// Wraps a [syn] type for unit tests.
-///
-/// Most [syn] types don't implement [Debug] or [PartialEq] which makes them unable to be used in
-/// [assert_eq]. This type fixes the problem.
-pub struct Assertable<T>(pub T);
-
-impl<T> AsRef<T> for Assertable<T> {
-    fn as_ref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: ToTokens> Debug for Assertable<T> {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.0.to_token_stream().to_string())
-    }
-}
-
-impl<T: ToTokens> PartialEq for Assertable<T> {
-    fn eq(&self, other: &Self) -> bool {
-        fn to_string<T: ToTokens>(a: &T) -> String {
-            a.to_token_stream().to_string()
-        }
-        to_string(&self.0) == to_string(&other.0)
-    }
-}
-
-impl<T: ToTokens> ToTokens for Assertable<T> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens)
-    }
 }
 
 /// Specifies how to marshal the arguments and the returned value of a function across the FFI.
@@ -291,7 +256,7 @@ pub struct Module {
     /// Full path of this [Module]. An empty path indicates the root module.
     pub path: Vec<String>,
 
-    pub cfg: Vec<Assertable<Attribute>>,
+    pub cfg: Vec<Attribute>,
 }
 
 impl Module {
@@ -428,7 +393,7 @@ pub struct Function {
     pub inputs: Vec<Input>,
     pub name: String,
     pub output: Output,
-    pub cfg: Vec<Assertable<Attribute>>,
+    pub cfg: Vec<Attribute>,
 
     /// Public name exported to the target side.
     pub pubname: String,
@@ -458,11 +423,7 @@ impl Function {
     }
 
     /// Collects all `#[cfg]` in `self` and all its parent [Module].
-    pub fn collect_cfg<'a>(
-        &'a self,
-        module: &'a Module,
-        root: &'a Crate,
-    ) -> Vec<&Assertable<Attribute>> {
+    pub fn collect_cfg<'a>(&'a self, module: &'a Module, root: &'a Crate) -> Vec<&Attribute> {
         root.modules_by_path(&module.path)
             .iter()
             .flat_map(|m| m.cfg.iter())
@@ -479,7 +440,7 @@ pub struct Input {
     pub borrow: bool,
 
     /// The actual type wrapped inside a [Result] or an [Option].
-    pub unwrapped_type: Assertable<syn::Path>,
+    pub unwrapped_type: syn::Path,
 }
 
 impl Input {
@@ -501,7 +462,7 @@ impl Input {
                 Ok(Self {
                     rule,
                     borrow,
-                    unwrapped_type: Assertable(unwrapped_type),
+                    unwrapped_type,
                 })
             }
             FnArg::Receiver(_) => todo!("`#[fun]` on a method not implemented"),
@@ -515,7 +476,7 @@ pub struct Output {
     pub rule: MarshalingRule,
 
     /// The actual type wrapped inside a [Result] or an [Option].
-    pub unwrapped_type: Assertable<syn::Path>,
+    pub unwrapped_type: syn::Path,
 }
 
 impl Output {
@@ -536,7 +497,7 @@ impl Output {
 
         Ok(Self {
             rule,
-            unwrapped_type: Assertable(unwrapped_type),
+            unwrapped_type,
         })
     }
 
@@ -551,7 +512,7 @@ impl Output {
             MarshalingRule::I64 => syn::parse_quote! { i64 },
             MarshalingRule::Struct => Type::Path(TypePath {
                 qself: None,
-                path: self.unwrapped_type.0.clone(),
+                path: self.unwrapped_type.clone(),
             }),
             MarshalingRule::String => syn::parse_quote! { ::std::string::String },
             MarshalingRule::Unit => syn::parse_quote! { () },
@@ -563,10 +524,10 @@ impl Default for Output {
     fn default() -> Self {
         Self {
             rule: MarshalingRule::Unit,
-            unwrapped_type: Assertable(syn::Path {
+            unwrapped_type: syn::Path {
                 leading_colon: None,
                 segments: Default::default(),
-            }),
+            },
         }
     }
 }
@@ -623,12 +584,12 @@ mod test {
                 Input {
                     rule: MarshalingRule::Bool,
                     borrow: false,
-                    unwrapped_type: Assertable(syn::parse_quote! { bool }),
+                    unwrapped_type: syn::parse_quote! { bool },
                 },
                 Input {
                     rule: MarshalingRule::Bytes,
                     borrow: true,
-                    unwrapped_type: Assertable(syn::parse_quote! { String }),
+                    unwrapped_type: syn::parse_quote! { String },
                 },
             ],
             output: Output::parse(&function.sig.output, args.marshal).unwrap(),
@@ -645,7 +606,7 @@ mod test {
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
-                unwrapped_type: Assertable(syn::parse_quote! { String }),
+                unwrapped_type: syn::parse_quote! { String },
             },
             Input::parse(&syn::parse_quote! { a: String }).unwrap(),
         );
@@ -653,7 +614,7 @@ mod test {
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
-                unwrapped_type: Assertable(syn::parse_quote! { usize }),
+                unwrapped_type: syn::parse_quote! { usize },
             },
             Input::parse(&syn::parse_quote! { #[riko::marshal = "String"] b: usize }).unwrap(),
         );
@@ -661,7 +622,7 @@ mod test {
             Input {
                 rule: MarshalingRule::Bytes,
                 borrow: true,
-                unwrapped_type: Assertable(syn::parse_quote! { ByteBuf }),
+                unwrapped_type: syn::parse_quote! { ByteBuf },
             },
             Input::parse(&syn::parse_quote! { c: &ByteBuf }).unwrap(),
         );
@@ -669,7 +630,7 @@ mod test {
             Input {
                 rule: MarshalingRule::I32,
                 borrow: true,
-                unwrapped_type: Assertable(syn::parse_quote! { Vec<u8> }),
+                unwrapped_type: syn::parse_quote! { Vec<u8> },
             },
             Input::parse(&syn::parse_quote! { #[riko::marshal = "I32"] d: &Vec<u8> }).unwrap(),
         );
@@ -677,7 +638,7 @@ mod test {
             Input {
                 rule: MarshalingRule::String,
                 borrow: false,
-                unwrapped_type: Assertable(syn::parse_quote! { String }),
+                unwrapped_type: syn::parse_quote! { String },
             },
             Input::parse(&syn::parse_quote! { a: String }).unwrap(),
         );
@@ -688,21 +649,21 @@ mod test {
         assert_eq!(
             Output {
                 rule: MarshalingRule::Bool,
-                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+                unwrapped_type: syn::parse_quote! { bool },
             },
             Output::parse(&syn::parse_quote! { -> bool }, None).unwrap(),
         );
         assert_eq!(
             Output {
                 rule: MarshalingRule::I32,
-                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+                unwrapped_type: syn::parse_quote! { bool },
             },
             Output::parse(&syn::parse_quote! { -> bool }, Some(MarshalingRule::I32)).unwrap(),
         );
         assert_eq!(
             Output {
                 rule: MarshalingRule::I32,
-                unwrapped_type: Assertable(syn::parse_quote! { bool }),
+                unwrapped_type: syn::parse_quote! { bool },
             },
             Output::parse(
                 &syn::parse_quote! { -> Result<Option<bool>, Error> },
