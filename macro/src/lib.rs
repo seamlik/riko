@@ -1,7 +1,4 @@
 //! Marker attributes of [Riko](https://github.com/seamlik/riko)
-//!
-//! This crate contains target-neutral marker attributes. For documentation on a specific language
-//! target, consult the modules in [riko_core].
 
 #![feature(drain_filter)]
 
