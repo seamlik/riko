@@ -123,7 +123,7 @@ impl TargetCodeWriter for JniWriter {
 
             // Arguments
             let arg_raw = quote! {
-                ::riko_runtime::Marshal::from_jni(&_env, #param_name)
+                ::riko_runtime_jni::unmarshal(&_env, #param_name)
             };
             let arg = if input.borrow {
                 quote! { &(#arg_raw) }
@@ -157,7 +157,7 @@ impl TargetCodeWriter for JniWriter {
                 );
                 #shelve
                 let result: ::riko_runtime::returned::Returned<#output_type> = result.into();
-                ::riko_runtime::Marshal::to_jni(&result, &_env)
+                ::riko_runtime_jni::marshal(&result, &_env)
             }
         };
         result
@@ -327,11 +327,11 @@ mod test {
                 arg_1_jni: ::jni::sys::jbyteArray
             ) -> ::jni::sys::jbyteArray {
                 let result = crate::example::function(
-                    &(::riko_runtime::Marshal::from_jni(&_env, arg_0_jni)),
-                    ::riko_runtime::Marshal::from_jni(&_env, arg_1_jni)
+                    &(::riko_runtime_jni::unmarshal(&_env, arg_0_jni)),
+                    ::riko_runtime_jni::unmarshal(&_env, arg_1_jni)
                 );
                 let result: ::riko_runtime::returned::Returned<::std::string::String> = result.into();
-                ::riko_runtime::Marshal::to_jni(&result, &_env)
+                ::riko_runtime_jni::marshal(&result, &_env)
             }
         }
         .to_string();
@@ -379,7 +379,7 @@ mod test {
                 let result = crate::example::function();
                 let result = ::riko_runtime::object::Shelve::shelve(result);
                 let result: ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> = result.into();
-                ::riko_runtime::Marshal::to_jni(&result, &_env)
+                ::riko_runtime_jni::marshal(&result, &_env)
             }
         }
             .to_string();
@@ -425,7 +425,7 @@ mod test {
             ) -> ::jni::sys::jbyteArray {
                 let result = crate::example::function();
                 let result: ::riko_runtime::returned::Returned<()> = result.into();
-                ::riko_runtime::Marshal::to_jni(&result, &_env)
+                ::riko_runtime_jni::marshal(&result, &_env)
             }
         }
         .to_string();

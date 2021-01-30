@@ -47,8 +47,9 @@ Dependencies for Generated Code
 
 The mandatory ones are:
 
-* Runtime support: [riko_runtime](https://crates.io/crates/riko_runtime) with necessary features
+* Runtime support: [riko_runtime](https://crates.io/crates/riko_runtime)
 
 The optional ones are:
 
 * Marshaling byte arrays: [serde_bytes](https://crates.io/crates/serde_bytes)
+* JNI support: [riko_runtime_jni](https://crates.io/crates/riko_runtime_jni), [jni](https://crates.io/crates/jni)

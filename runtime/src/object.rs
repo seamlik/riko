@@ -1,8 +1,5 @@
 //! Handling heap-allocated objects.
 
-#[cfg(feature = "riko_jni")]
-pub mod jni;
-
 use crate::returned::Returned;
 use std::any::Any;
 use std::collections::HashMap;

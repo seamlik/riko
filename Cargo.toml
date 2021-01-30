@@ -1,6 +1,8 @@
 [workspace]
 members = [
+  "jni/runtime-rust",
   "macro",
+  "runtime",
   "sample/rust"
 ]
 
