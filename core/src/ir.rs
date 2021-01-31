@@ -174,12 +174,6 @@ pub enum MarshalingRule {
 
 impl MarshalingRule {
     fn infer(t: &syn::Path) -> Self {
-        fn matches(candidate: &'static [&'static str], raw: &str) -> bool {
-            raw == *candidate.last().unwrap()
-                || raw == candidate[1..].join(" :: ")
-                || raw == candidate.join(" :: ").trim()
-        }
-
         let type_path_str = t.segments.to_token_stream().to_string();
 
         if "bool" == type_path_str {
@@ -192,9 +186,9 @@ impl MarshalingRule {
             Self::I8
         } else if type_path_str.trim().is_empty() {
             Self::Unit
-        } else if matches(&["", "std", "string", "String"], &type_path_str) {
+        } else if type_path_matches(&["", "std", "string", "String"], &type_path_str) {
             Self::String
-        } else if matches(&["", "serde_bytes", "ByteBuf"], &type_path_str) {
+        } else if type_path_matches(&["", "serde_bytes", "ByteBuf"], &type_path_str) {
             Self::Bytes
         } else {
             Self::Struct
@@ -532,13 +526,55 @@ impl Default for Output {
     }
 }
 
+/// Test if a type path matches the candidate.
+///
+/// For the type `String`, it matches:
+///
+/// * `String`
+/// * `std::string::String`
+/// * `::std::string::String`
+fn type_path_matches(candidate: &'static [&'static str], ty: &str) -> bool {
+    ty == *candidate.last().unwrap()
+        || ty == candidate[1..].join(" :: ")
+        || ty == candidate.join(" :: ").trim()
+}
+
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod test {
     use super::*;
 
     #[test]
-    fn MarshalingRule_infer() {
+    fn type_path_matches() {
+        let candidate = &["", "std", "string", "String"];
+
+        assert_eq!(true, super::type_path_matches(candidate, "String"));
+        assert_eq!(
+            true,
+            super::type_path_matches(candidate, "std :: string :: String")
+        );
+        assert_eq!(
+            true,
+            super::type_path_matches(candidate, ":: std :: string :: String")
+        );
+
+        assert_eq!(false, super::type_path_matches(candidate, "Future"));
+        assert_eq!(
+            false,
+            super::type_path_matches(candidate, "std :: future :: Future")
+        );
+        assert_eq!(
+            false,
+            super::type_path_matches(candidate, "std :: string :: Future")
+        );
+        assert_eq!(
+            false,
+            super::type_path_matches(candidate, ":: std :: future :: Future")
+        );
+    }
+
+    #[test]
+    fn infer_marshaling_rule() {
         assert_eq!(
             MarshalingRule::infer(&syn::parse_quote! { ByteBuf }),
             MarshalingRule::Bytes
@@ -566,7 +602,7 @@ mod test {
     }
 
     #[test]
-    fn function() {
+    fn parse_function() {
         let function: syn::ItemFn = syn::parse_quote! {
             #[riko::fun(marshal = "I32", name = "function2")]
             fn function(
@@ -601,7 +637,7 @@ mod test {
     }
 
     #[test]
-    fn input() {
+    fn parse_input() {
         assert_eq!(
             Input {
                 rule: MarshalingRule::String,
@@ -682,7 +718,7 @@ mod test {
     }
 
     #[async_std::test]
-    async fn cfg() {
+    async fn parse_cfg() {
         let module: ItemMod = syn::parse_quote! {
             #[cfg(feature = "riko_outer")]
             mod util {

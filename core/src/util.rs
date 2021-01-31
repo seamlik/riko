@@ -5,6 +5,10 @@ use syn::Path;
 use syn::PathArguments;
 use syn::Type;
 
+/// [Iterator] of layers of nested wrapper types.
+///
+/// For example, for `Arc<Result<Option<String>>>`, it iterates over `Arc`, `Result`, `Option` and
+/// `String`.
 struct TypeLayerIter {
     cursor: Option<Path>,
 }
@@ -56,6 +60,9 @@ impl Iterator for TypeLayerIter {
 
 static WRAPPERS: &[&str] = &["Arc", "Option", "Result"];
 
+/// Unwraps the actual type wrapped in layers of nested containers.
+///
+/// For example, when unwrapping `Arc<Result<Option<String>>>`, `String` is the result.
 pub fn unwrap_type(ty: syn::Path) -> Path {
     let default = Path {
         leading_colon: None,
@@ -104,36 +111,38 @@ mod test {
 
     #[test]
     fn type_layers() {
-        fn run(path: Path) -> Vec<String> {
-            TypeLayerIter::new(path)
-                .map(|t| {
-                    t.segments
-                        .last()
-                        .map(|segment| segment.ident.to_string())
-                        .unwrap_or_default()
-                })
-                .collect::<Vec<_>>()
-        }
-
         let expected = vec!["Option", "bool"];
-        let actual = run(syn::parse_quote! { Option<bool> });
+        let actual = expand_type_layers(syn::parse_quote! { Option<bool> });
         assert_eq!(expected, actual);
 
         let expected = vec!["Result", "bool"];
-        let actual = run(syn::parse_quote! { Result<bool, Error> });
+        let actual = expand_type_layers(syn::parse_quote! { Result<bool, Error> });
         assert_eq!(expected, actual);
 
         let expected = vec!["Result", "Option", "bool"];
-        let actual = run(syn::parse_quote! { Result<Option<bool>, Error> });
+        let actual = expand_type_layers(syn::parse_quote! { Result<Option<bool>, Error> });
         assert_eq!(expected, actual);
 
         let expected = vec!["Arc", "Result", "Option", "Love"];
-        let actual = run(syn::parse_quote! { std::sync::Arc<Result<Option<Love>>, anyhow::Error> });
+        let actual = expand_type_layers(
+            syn::parse_quote! { std::sync::Arc<Result<Option<Love>>, anyhow::Error> },
+        );
         assert_eq!(expected, actual);
 
         let expected = vec!["Result", ""];
-        let actual = run(syn::parse_quote! { Result<(), Error> });
+        let actual = expand_type_layers(syn::parse_quote! { Result<(), Error> });
         assert_eq!(expected, actual);
+    }
+
+    fn expand_type_layers(path: Path) -> Vec<String> {
+        TypeLayerIter::new(path)
+            .map(|t| {
+                t.segments
+                    .last()
+                    .map(|segment| segment.ident.to_string())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
     }
 
     #[test]
