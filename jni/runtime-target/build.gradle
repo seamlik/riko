@@ -22,7 +22,7 @@ publishing {
 
 spotless {
   java {
-    googleJavaFormat()
+    googleJavaFormat('1.9')
   }
   kotlin {
     ktfmt('0.19')
