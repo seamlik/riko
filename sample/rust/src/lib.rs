@@ -7,7 +7,9 @@ mod bridge;
 mod object;
 mod structs;
 
+use futures_channel::oneshot::Canceled;
 use serde_bytes::ByteBuf;
+use std::time::Duration;
 
 #[riko::fun]
 fn nothing() {}
@@ -53,4 +55,16 @@ fn _bool(x: bool, y: bool) -> bool {
 
 pub fn ignored() {
     panic!("This function is not exported")
+}
+
+#[riko::fun]
+async fn future() -> Result<String, Canceled> {
+    let (sender, receiver) = futures_channel::oneshot::channel::<String>();
+    std::thread::spawn(move || sender.send("love".into()));
+    receiver.await
+}
+
+#[riko::fun]
+async fn future_slow() {
+    futures_timer::Delay::new(Duration::from_secs(10)).await
 }

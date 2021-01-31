@@ -49,14 +49,24 @@ impl TargetCodeWriter for JniWriter {
 
     fn write_target_function(&self, function: &Function, _: &Module, _: &Crate) -> String {
         // TODO: Support returning nullabe objects
-        let return_type_public = target_type_public(function.output.rule, false);
+        let return_type_public =
+            target_type_public(function.output.rule, false, function.output.future);
 
-        let return_block = match function.output.rule {
-            MarshalingRule::Unit => "",
-            MarshalingRule::Object => "return new riko.Object(result.asInt32().intValue());",
-            _ => "return result;",
-        }
-        .to_string();
+        let return_block = if function.output.future {
+            "return new riko.Future(result.asInt32().intValue());"
+        } else {
+            match function.output.rule {
+                MarshalingRule::Unit => "",
+                MarshalingRule::Object => "return new riko.Object(result.asInt32().intValue());",
+                _ => "return result;",
+            }
+        };
+
+        let initialize_block = if function.output.future {
+            "riko.Initializer.initialize();"
+        } else {
+            ""
+        };
 
         let args = function
             .inputs
@@ -69,7 +79,11 @@ impl TargetCodeWriter for JniWriter {
             .iter()
             .enumerate()
             .map(|(idx, input)| {
-                format!("final {} arg_{}", target_type_public(input.rule, true), idx)
+                format!(
+                    "final {} arg_{}",
+                    target_type_public(input.rule, true, false),
+                    idx
+                )
             })
             .join(", ");
         let params_bridge = function
@@ -83,6 +97,7 @@ impl TargetCodeWriter for JniWriter {
             r#"
               private static native byte[] __riko_{name}( {params_bridge} );
               public static {return_type_public} {name}( {params_public} ) {{
+                {initialize_block}
                 final byte[] returned = __riko_{name}( {args} );
                 final org.bson.BsonValue result = riko
                     .Marshaler
@@ -92,6 +107,7 @@ impl TargetCodeWriter for JniWriter {
               }}
             "#,
             args = args,
+            initialize_block = initialize_block,
             name = &function.pubname,
             params_bridge = params_bridge,
             params_public = params_public,
@@ -102,6 +118,7 @@ impl TargetCodeWriter for JniWriter {
 
     fn write_bridge_function(&self, function: &Function, module: &Module, root: &Crate) -> ItemFn {
         let output_type = function.output.marshaled_type();
+        let returned_type = &function.output.returned_type();
 
         // Name of the generated function
         let full_public_name = full_function_name(&function.name, &module.path);
@@ -137,6 +154,10 @@ impl TargetCodeWriter for JniWriter {
         let shelve = if function.output.rule == MarshalingRule::Object {
             quote! {
                 let result = ::riko_runtime::object::Shelve::shelve(result);
+            }
+        } else if function.output.future {
+            quote! {
+                let result = ::riko_runtime_jni::future::spawn::<_, _, #returned_type>(result);
             }
         } else {
             Default::default()
@@ -191,17 +212,21 @@ impl TargetCodeWriter for JniWriter {
     }
 }
 
-fn target_type_public(rule: MarshalingRule, nullable: bool) -> String {
+fn target_type_public(rule: MarshalingRule, nullable: bool, future: bool) -> String {
     let nullability = if nullable {
         NULLABLE_ATTRIBUTE
     } else {
         NONNULL_ATTRIBUTE
     };
-    match rule {
-        MarshalingRule::Unit => "void".into(),
-        MarshalingRule::Object => format!("riko. @ {} Object", nullability),
+    if future {
+        format!("riko. @ {} Future", NONNULL_ATTRIBUTE)
+    } else {
+        match rule {
+            MarshalingRule::Unit => "void".into(),
+            MarshalingRule::Object => format!("riko. @ {} Object", nullability),
 
-        _ => format!("org.bson. @ {} BsonValue", nullability),
+            _ => format!("org.bson. @ {} BsonValue", nullability),
+        }
     }
 }
 
@@ -378,7 +403,53 @@ mod test {
             ) -> ::jni::sys::jbyteArray {
                 let result = crate::example::function();
                 let result = ::riko_runtime::object::Shelve::shelve(result);
-                let result: ::riko_runtime::returned::Returned<::riko_runtime::object::Handle> = result.into();
+                let result: ::riko_runtime::returned::Returned<::riko_runtime::Handle> = result.into();
+                ::riko_runtime_jni::marshal(&result, &_env)
+            }
+        }
+            .to_string();
+        let actual = JniWriter
+            .write_bridge_function(&ir.modules[0].functions[0], &ir.modules[0], &ir)
+            .into_token_stream()
+            .to_string();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn function_async() {
+        let ir = crate::ir::sample::function_async();
+
+        let expected = r#"
+            private static native byte[] __riko_function( );
+            public static riko. @ org.checkerframework.checker.nullness.qual.NonNull Future function( ) {
+                riko.Initializer.initialize();
+                final byte[] returned = __riko_function( );
+                final org.bson.BsonValue result = riko
+                    .Marshaler
+                    .decode(returned)
+                    .unwrap();
+                return new riko.Future(result.asInt32().intValue());
+            }
+        "#;
+        let actual =
+            JniWriter.write_target_function(&ir.modules[0].functions[0], &ir.modules[0], &ir);
+        assert_eq!(
+            crate::normalize_source_code(expected),
+            crate::normalize_source_code(&actual),
+        );
+
+        let expected = quote! {
+            #[no_mangle]
+            #[allow(clippy::useless_conversion)]
+            #[allow(clippy::let_unit_value)]
+            #[allow(clippy::unit_arg)]
+            pub extern "C" fn Java_riko_1sample_example_Module__1_1riko_1function(
+                _env: ::jni::JNIEnv,
+                _class: ::jni::objects::JClass
+            ) -> ::jni::sys::jbyteArray {
+                let result = crate::example::function();
+                let result = ::riko_runtime_jni::future::spawn::<_, _, ::std::string::String>(result);
+                let result: ::riko_runtime::returned::Returned<::riko_runtime::Handle> = result.into();
                 ::riko_runtime_jni::marshal(&result, &_env)
             }
         }

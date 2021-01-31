@@ -7,4 +7,6 @@ repository = "https://github.com/seamlik/riko"
 version = "0.0.1"
 
 [dependencies]
+futures-executor = { version = "0.3", features = ["thread-pool"] }
+futures-util = { version = "0.3", features = ["channel"] }
 serde = { version = "1", features = ["derive"] }

@@ -1,6 +1,7 @@
 //! Handling heap-allocated objects.
 
 use crate::returned::Returned;
+use crate::Handle;
 use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
@@ -60,9 +61,6 @@ where
         }
     }
 }
-
-/// Opaque handle pointing to a [Object].
-pub type Handle = i32;
 
 /// The global [Pool] that every [Object] is stored.
 pub static POOL: SyncLazy<Pool> = SyncLazy::new(Default::default);

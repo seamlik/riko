@@ -2,8 +2,8 @@
 
 use jni::objects::JObject;
 use jni::JNIEnv;
-use riko_runtime::object::Handle;
 use riko_runtime::object::POOL;
+use riko_runtime::Handle;
 
 #[no_mangle]
 pub extern "C" fn Java_riko_Object_close(env: JNIEnv, this: JObject) {

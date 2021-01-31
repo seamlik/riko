@@ -1,9 +1,12 @@
 package riko;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Paths;
+import java.util.concurrent.CancellationException;
 import org.bson.BsonBinary;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
@@ -98,5 +101,17 @@ class IntegrationTests {
     assertTrue(object.alive());
     object.close();
     assertFalse(object.alive());
+  }
+
+  @Test
+  void asyncAwait() {
+    assertEquals("love", riko_sample.Module.future().get().asString().getValue());
+  }
+
+  @Test
+  void asyncCancel() {
+    final Future future = riko_sample.Module.future_slow();
+    future.cancel(true);
+    assertThrows(CancellationException.class, future::get);
   }
 }

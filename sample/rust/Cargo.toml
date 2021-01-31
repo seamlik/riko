@@ -11,6 +11,8 @@ targets = ["jni"]
 crate-type = ["cdylib"]
 
 [dependencies]
+futures-channel = "0.3"
+futures-timer = "3"
 jni = "0"
 riko = { path = "../../macro" }
 riko_runtime = { path = "../../runtime" }

@@ -530,8 +530,16 @@ impl Output {
 
     /// The type to use in the bridge code as `Returned<#marshaled_type>`.
     pub fn marshaled_type(&self) -> Type {
+        if self.future {
+            syn::parse_quote! { ::riko_runtime::Handle }
+        } else {
+            self.returned_type()
+        }
+    }
+
+    pub fn returned_type(&self) -> Type {
         match self.rule {
-            MarshalingRule::Object => syn::parse_quote! { ::riko_runtime::object::Handle },
+            MarshalingRule::Object => syn::parse_quote! { ::riko_runtime::Handle },
             MarshalingRule::Bool => syn::parse_quote! { bool },
             MarshalingRule::Bytes => syn::parse_quote! { ::serde_bytes::ByteBuf },
             MarshalingRule::I8 => syn::parse_quote! { i8 },

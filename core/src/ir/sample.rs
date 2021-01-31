@@ -89,3 +89,25 @@ pub(crate) fn function_with_nothing() -> Crate {
         }],
     }
 }
+
+/// `riko_sample::example::function() -> Future<Output = Result<String, Error>>`
+pub(crate) fn function_async() -> Crate {
+    Crate {
+        name: "riko_sample".into(),
+        modules: vec![Module {
+            functions: vec![Function {
+                name: "function".into(),
+                pubname: "function".into(),
+                inputs: vec![],
+                output: Output {
+                    future: true,
+                    rule: MarshalingRule::String,
+                    unwrapped_type: syn::parse_quote! { String },
+                },
+                cfg: vec![],
+            }],
+            path: vec!["example".into()],
+            cfg: vec![],
+        }],
+    }
+}
