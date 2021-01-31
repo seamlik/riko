@@ -37,7 +37,7 @@ impl Iterator for TypeLayerIter {
                                     }
                                 }
                                 GenericArgument::Binding(binding) => {
-                                    if binding.ident.to_string() == "Output" {
+                                    if binding.ident == "Output" {
                                         if let Ok(ty) = assert_type_is_path(&binding.ty) {
                                             Some(ty)
                                         } else {
