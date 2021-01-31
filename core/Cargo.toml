@@ -19,4 +19,5 @@ syn = { version = "1", features = ["extra-traits"] }
 thiserror = "1"
 
 [dev-dependencies]
+async-std = { version = "1", features = ["attributes"] }
 regex = { version = "1", features = ["pattern"] }
