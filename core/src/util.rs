@@ -9,12 +9,12 @@ use syn::Type;
 ///
 /// For example, for `Arc<Result<Option<String>>>`, it iterates over `Arc`, `Result`, `Option` and
 /// `String`.
-struct TypeLayerIter {
+pub struct TypeLayerIter {
     cursor: Option<Path>,
 }
 
 impl TypeLayerIter {
-    fn new(ty: Path) -> Self {
+    pub fn new(ty: Path) -> Self {
         Self { cursor: Some(ty) }
     }
 }
@@ -23,42 +23,52 @@ impl Iterator for TypeLayerIter {
     type Item = Path;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.cursor.clone() {
-            None => None,
-            Some(cursor) => match cursor.segments.last() {
-                None => {
-                    self.cursor = None;
-                    Some(Path {
-                        leading_colon: None,
-                        segments: Default::default(),
-                    })
-                }
-                Some(current) => {
-                    self.cursor = match &current.arguments {
-                        PathArguments::AngleBracketed(arg) => match arg.args.first() {
-                            None => None,
-                            Some(arg) => {
-                                if let GenericArgument::Type(ty) = arg {
+        if let Some(cursor) = std::mem::take(&mut self.cursor) {
+            if let Some(current) = cursor.segments.last() {
+                self.cursor = match &current.arguments {
+                    PathArguments::AngleBracketed(arg) => {
+                        if let Some(arg) = arg.args.first() {
+                            match arg {
+                                GenericArgument::Type(ty) => {
                                     if let Ok(ty) = assert_type_is_path(&ty) {
                                         Some(ty)
                                     } else {
                                         None
                                     }
-                                } else {
-                                    None
                                 }
+                                GenericArgument::Binding(binding) => {
+                                    if binding.ident.to_string() == "Output" {
+                                        if let Ok(ty) = assert_type_is_path(&binding.ty) {
+                                            Some(ty)
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                }
+                                _ => None,
                             }
-                        },
-                        _ => None,
-                    };
-                    Some(cursor.clone())
-                }
-            },
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                Some(cursor.clone())
+            } else {
+                Some(Path {
+                    leading_colon: None,
+                    segments: Default::default(),
+                })
+            }
+        } else {
+            None
         }
     }
 }
 
-static WRAPPERS: &[&str] = &["Arc", "Option", "Result"];
+static WRAPPERS: &[&str] = &["Arc", "Option", "Result", "Future"];
 
 /// Unwraps the actual type wrapped in layers of nested containers.
 ///
@@ -115,6 +125,10 @@ mod test {
         let actual = expand_type_layers(syn::parse_quote! { Option<bool> });
         assert_eq!(expected, actual);
 
+        let expected = vec!["Future", "bool"];
+        let actual = expand_type_layers(syn::parse_quote! { Future<Output = bool> });
+        assert_eq!(expected, actual);
+
         let expected = vec!["Result", "bool"];
         let actual = expand_type_layers(syn::parse_quote! { Result<bool, Error> });
         assert_eq!(expected, actual);
@@ -153,6 +167,10 @@ mod test {
 
         let expected = "bool";
         let actual = run(syn::parse_quote! { Option<bool> });
+        assert_eq!(expected, actual);
+
+        let expected = "bool";
+        let actual = run(syn::parse_quote! { Future<Output = bool> });
         assert_eq!(expected, actual);
 
         let expected = "bool";

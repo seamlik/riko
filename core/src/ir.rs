@@ -9,6 +9,7 @@ pub(crate) mod sample;
 use crate::parse::Args;
 use crate::parse::Fun;
 use crate::parse::Marshal;
+use crate::util::TypeLayerIter;
 use crate::ErrorSource;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
@@ -25,6 +26,7 @@ use syn::ItemFn;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Meta;
+use syn::PathArguments;
 use syn::ReturnType;
 use syn::Type;
 use syn::TypePath;
@@ -411,7 +413,7 @@ impl Function {
                 args.name
             },
             name,
-            output: Output::parse(&item.sig.output, args.marshal)?,
+            output: Output::parse(&item.sig.output, args.marshal, item.sig.asyncness.is_some())?,
             cfg: extract_cfg(item.attrs.into_iter()),
         })
     }
@@ -467,6 +469,8 @@ impl Input {
 /// Function return type.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Output {
+    pub future: bool,
+
     pub rule: MarshalingRule,
 
     /// The actual type wrapped inside a [Result] or an [Option].
@@ -474,7 +478,11 @@ pub(crate) struct Output {
 }
 
 impl Output {
-    fn parse(sig: &ReturnType, rule_hint: Option<MarshalingRule>) -> syn::Result<Self> {
+    fn parse(
+        sig: &ReturnType,
+        rule_hint: Option<MarshalingRule>,
+        future_hint: bool,
+    ) -> syn::Result<Self> {
         let original_type = match sig {
             ReturnType::Default => syn::Path {
                 leading_colon: None,
@@ -482,17 +490,42 @@ impl Output {
             },
             ReturnType::Type(_, ty) => crate::util::assert_type_is_path(&*ty)?,
         };
-        let unwrapped_type = crate::util::unwrap_type(original_type);
+        let unwrapped_type = crate::util::unwrap_type(original_type.clone());
+
+        // Marshaling rule
         let rule = if let Some(inner) = rule_hint {
             inner
         } else {
             MarshalingRule::infer(&unwrapped_type)
         };
 
+        // future
+        let future = future_hint
+            || TypeLayerIter::new(original_type)
+                .next()
+                .map_or(false, |mut ty| {
+                    Self::strip_type_parameters(&mut ty);
+                    // Check if the first layer of the type is `Future`
+                    type_path_matches(
+                        &["", "std", "future", "Future"],
+                        &ty.to_token_stream().to_string(),
+                    )
+                });
+
         Ok(Self {
+            future,
             rule,
             unwrapped_type,
         })
+    }
+
+    /// Strips a [Path](syn::Path) of its type parameters.
+    ///
+    /// For example: `std::option::Option<bool>` becomes `std::option::Option`.
+    fn strip_type_parameters(path: &mut syn::Path) {
+        for it in path.segments.iter_mut() {
+            it.arguments = PathArguments::None
+        }
     }
 
     /// The type to use in the bridge code as `Returned<#marshaled_type>`.
@@ -517,6 +550,7 @@ impl Output {
 impl Default for Output {
     fn default() -> Self {
         Self {
+            future: false,
             rule: MarshalingRule::Unit,
             unwrapped_type: syn::Path {
                 leading_colon: None,
@@ -628,7 +662,11 @@ mod test {
                     unwrapped_type: syn::parse_quote! { String },
                 },
             ],
-            output: Output::parse(&function.sig.output, args.marshal).unwrap(),
+            output: Output {
+                future: false,
+                rule: MarshalingRule::I32,
+                unwrapped_type: syn::parse_quote! { Vec<u8> },
+            },
             pubname: "function2".into(),
             cfg: Default::default(),
         };
@@ -681,39 +719,71 @@ mod test {
     }
 
     #[test]
-    fn output() {
+    fn parse_output() {
         assert_eq!(
             Output {
+                future: false,
                 rule: MarshalingRule::Bool,
                 unwrapped_type: syn::parse_quote! { bool },
             },
-            Output::parse(&syn::parse_quote! { -> bool }, None).unwrap(),
+            Output::parse(&syn::parse_quote! { -> bool }, None, false).unwrap(),
         );
+
+        // Infer future
         assert_eq!(
             Output {
+                future: true,
+                rule: MarshalingRule::Bool,
+                unwrapped_type: syn::parse_quote! { bool },
+            },
+            Output::parse(&syn::parse_quote! { -> Future<Output = bool> }, None, false).unwrap(),
+        );
+
+        // Force future
+        assert_eq!(
+            Output {
+                future: true,
+                rule: MarshalingRule::Bool,
+                unwrapped_type: syn::parse_quote! { bool },
+            },
+            Output::parse(&syn::parse_quote! { -> bool }, None, true).unwrap(),
+        );
+
+        // Force a different rule
+        assert_eq!(
+            Output {
+                future: false,
                 rule: MarshalingRule::I32,
                 unwrapped_type: syn::parse_quote! { bool },
             },
-            Output::parse(&syn::parse_quote! { -> bool }, Some(MarshalingRule::I32)).unwrap(),
+            Output::parse(
+                &syn::parse_quote! { -> bool },
+                Some(MarshalingRule::I32),
+                false
+            )
+            .unwrap(),
         );
+
         assert_eq!(
             Output {
+                future: false,
                 rule: MarshalingRule::I32,
                 unwrapped_type: syn::parse_quote! { bool },
             },
             Output::parse(
                 &syn::parse_quote! { -> Result<Option<bool>, Error> },
-                Some(MarshalingRule::I32)
+                Some(MarshalingRule::I32),
+                false,
             )
             .unwrap(),
         );
         assert_eq!(
             Output::default(),
-            Output::parse(&syn::parse_quote! { -> () }, None).unwrap(),
+            Output::parse(&syn::parse_quote! { -> () }, None, false).unwrap(),
         );
         assert_eq!(
             Output::default(),
-            Output::parse(&syn::parse_quote! {}, None).unwrap(),
+            Output::parse(&syn::parse_quote! {}, None, false).unwrap(),
         );
     }
 

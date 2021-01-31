@@ -33,6 +33,7 @@ pub(crate) fn simple_function() -> Crate {
                     },
                 ],
                 output: Output {
+                    future: false,
                     rule: MarshalingRule::String,
                     unwrapped_type: syn::parse_quote! { String },
                 },
@@ -53,6 +54,7 @@ pub(crate) fn returning_object() -> Crate {
                 pubname: "function".into(),
                 inputs: vec![],
                 output: Output {
+                    future: false,
                     rule: MarshalingRule::Object,
                     unwrapped_type: syn::parse_quote! { crate::Love },
                 },
@@ -73,6 +75,7 @@ pub(crate) fn function_with_nothing() -> Crate {
                 pubname: "function".into(),
                 inputs: vec![],
                 output: Output {
+                    future: false,
                     rule: MarshalingRule::Unit,
                     unwrapped_type: syn::Path {
                         leading_colon: None,
