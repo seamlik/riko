@@ -17,6 +17,9 @@ jobs:
           default: true
           profile: minimal
           toolchain: nightly
+      - uses: actions/setup-java@v1
+        with:
+          java-version: 11
       - run: make verify
       - uses: actions-rs/clippy-check@v1
         with:
