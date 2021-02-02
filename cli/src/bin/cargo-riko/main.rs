@@ -3,7 +3,7 @@ mod config;
 use config::Config;
 
 #[tokio::main]
-pub async fn main() -> anyhow::Result<()> {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
     for config in Config::read_all_configs()?.iter() {
         if config.cached.entry.iter().next().is_none() {

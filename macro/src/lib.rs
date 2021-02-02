@@ -1,4 +1,6 @@
 //! Marker attributes of [Riko](https://github.com/seamlik/riko)
+//!
+//! TODO: Document the attribute parameters
 
 #![feature(drain_filter)]
 

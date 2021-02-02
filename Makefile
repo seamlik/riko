@@ -12,5 +12,5 @@ verify: sample
 
 .PHONY: install
 install:
-	cargo install --path macro
+	cargo install --path cli
 	gradle publishToMavenLocal
