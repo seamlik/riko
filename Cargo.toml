@@ -5,6 +5,3 @@ members = [
   "runtime",
   "sample/rust"
 ]
-
-[profile.dev]
-lto = true
