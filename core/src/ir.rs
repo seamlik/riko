@@ -210,7 +210,7 @@ pub(crate) struct Crate {
 impl Crate {
     pub async fn parse(src: &Path, name: String) -> Result<Self, crate::Error> {
         log::info!("Reading `{}`", src.display());
-        let raw = async_std::fs::read_to_string(src)
+        let raw = tokio::fs::read_to_string(src)
             .await
             .map_err(|err| crate::Error {
                 file: src.to_owned(),
@@ -359,7 +359,7 @@ impl Module {
             .await
         } else {
             log::info!("Reading `{}`", file_path_child.display());
-            let raw = async_std::fs::read_to_string(&file_path_child)
+            let raw = tokio::fs::read_to_string(&file_path_child)
                 .await
                 .map_err(|err| crate::Error {
                     file: file_path_parent.to_owned(),
@@ -795,7 +795,7 @@ mod test {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn parse_cfg() {
         let module: ItemMod = syn::parse_quote! {
             #[cfg(feature = "riko_outer")]

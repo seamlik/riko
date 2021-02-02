@@ -7,7 +7,6 @@ repository = "https://github.com/seamlik/riko"
 version = "0.0.1"
 
 [dependencies]
-async-std = "1"
 itertools = "0"
 futures-util = { version = "0.3", features = ["io"] }
 log = "0"
@@ -17,7 +16,8 @@ strum = "0"
 strum_macros = "0"
 syn = { version = "1", features = ["extra-traits"] }
 thiserror = "1"
+tokio = { version = "1", features = ["fs", "io-util"] }
 
 [dev-dependencies]
-async-std = { version = "1", features = ["attributes"] }
 regex = { version = "1", features = ["pattern"] }
+tokio = { version = "1", features = ["fs", "rt-multi-thread", "macros"] }

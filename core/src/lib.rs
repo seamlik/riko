@@ -9,8 +9,6 @@ mod jni;
 pub mod parse;
 mod util;
 
-use async_std::fs::File;
-use futures_util::io::AsyncWriteExt;
 use futures_util::TryFutureExt;
 use ir::Crate;
 use ir::Function;
@@ -26,6 +24,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use syn::ItemFn;
 use thiserror::Error;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 /// Target code generation.
 trait TargetCodeWriter {
@@ -61,7 +61,7 @@ trait TargetCodeWriter {
 /// Used by [TargetCodeWriter] implementations.
 async fn open_file(path: &Path) -> std::io::Result<File> {
     log::info!("Writing to `{}`", path.display());
-    async_std::fs::create_dir_all(path.parent().unwrap()).await?;
+    tokio::fs::create_dir_all(path.parent().unwrap()).await?;
     File::create(path).await
 }
 
@@ -71,7 +71,7 @@ async fn open_file(path: &Path) -> std::io::Result<File> {
 async fn write_file(path: &Path, content: &str) -> std::io::Result<()> {
     log::info!("Writing to `{}`", path.display());
 
-    async_std::fs::create_dir_all(path.parent().unwrap()).await?;
+    tokio::fs::create_dir_all(path.parent().unwrap()).await?;
 
     let mut file = File::create(path).await?;
     file.write_all(content.as_bytes()).await
@@ -88,7 +88,7 @@ pub async fn bindgen<'a>(
     bridge_path.push(format!("{}.rs", crate_name));
     // Delete the bridge code first because it interferes with the IR scanning
     log::info!("Deleting bridge code: {}", bridge_path.display());
-    let _ = async_std::fs::remove_file(&bridge_path).await;
+    let _ = tokio::fs::remove_file(&bridge_path).await;
 
     let ir = Crate::parse(crate_entry, crate_name.into()).await?;
     let mut bridge = TokenStream::default();
@@ -106,7 +106,7 @@ pub async fn bindgen<'a>(
             "Deleting target code: {}",
             target_output_directory_root.display()
         );
-        let _ = async_std::fs::remove_dir_all(&target_output_directory_root).await;
+        let _ = tokio::fs::remove_dir_all(&target_output_directory_root).await;
 
         // TODO: Parallelize this
         for (path, code) in writer.write_target_all(&ir).iter() {

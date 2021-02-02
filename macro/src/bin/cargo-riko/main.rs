@@ -2,7 +2,7 @@ mod config;
 
 use config::Config;
 
-#[async_std::main]
+#[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     env_logger::init();
     for config in Config::read_all_configs()?.iter() {
