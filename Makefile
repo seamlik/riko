@@ -2,7 +2,7 @@
 sample:
 	cargo run --bin cargo-riko
 	rustfmt target/riko/*.rs
-	cargo build --package riko_sample
+	cargo -Z unstable-options build --package riko_sample --config profile.dev.lto=true
 
 .PHONY: verify
 verify: sample
