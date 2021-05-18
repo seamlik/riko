@@ -37,9 +37,8 @@ impl Pool {
             }
         };
         let (task, token) = task.remote_handle();
-        self.pool
-            .insert(handle, token)
-            .expect_none("Same handle used more than once");
+        let old_handle = self.pool.insert(handle, token);
+        assert!(old_handle.is_none(), "Same handle used more than once");
         self.executor.spawn(task).expect("Failed to spawn a job");
         handle
     }
